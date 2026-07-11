@@ -1,3 +1,16 @@
+# Package-local ignores (root .gitignore covers monorepo-wide rules).
+# Client-specific: Vite outputs and package-local env samples.
+
+# Dependencies & build
+node_modules
+dist
+dist-ssr
+
+# Env (never commit real keys)
+.env
+.env.*
+!.env.example
+
 # Logs
 logs
 *.log
@@ -6,21 +19,6 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
-
-# Dependencies & build
-node_modules
-dist
-dist-ssr
-*.local
-
-# Local-only (notes, mockups, private drafts)
-local/
-local
-
-# Environment
-.env
-.env.*
-!.env.example
 
 # Editor / OS
 .vscode/*
@@ -32,3 +30,4 @@ local
 *.njsproj
 *.sln
 *.sw?
+*.local

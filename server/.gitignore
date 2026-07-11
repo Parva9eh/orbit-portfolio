@@ -1,3 +1,5 @@
+# Package-local ignores (root .gitignore covers monorepo-wide rules).
+
 # Dependencies
 node_modules/
 
@@ -10,6 +12,3 @@ node_modules/
 logs/
 *.log
 .DS_Store
-
-# Local-only
-local/

@@ -1,3 +1,8 @@
+# =============================================================================
+# Root .gitignore — orbit-portfolio
+# Prefer root rules; package-level .gitignore files only add package-local needs.
+# =============================================================================
+
 # --- Dependencies ---
 node_modules/
 **/node_modules/
@@ -10,9 +15,9 @@ node_modules/
 **/.env.*
 !**/.env.example
 
-# --- Local-only workspace (notes, mockups, experiments) ---
-local/
-**/local/
+# --- Private workspace (reviews, plans, HTML mockups) ---
+docs/
+**/docs/
 
 # --- Build outputs ---
 dist/
@@ -43,16 +48,10 @@ Thumbs.db
 *.njsproj
 *.sln
 *.sw?
-*.local
 
-# --- Vite / tooling ---
+# --- Vite / tooling / caches ---
 *.local
 .cache/
 .turbo/
 .vercel/
 .netlify/
-
-# --- Optional large / dump artifacts ---
-# server/src/routes/data.json contains raw NASA dumps with embedded api_key query params
-# Uncomment to keep it out of the repo entirely:
-# server/src/routes/data.json

@@ -26,16 +26,23 @@ else
   bad "missing root .gitignore"
 fi
 
-if grep -qE '^local/|^\*\*/local/' .gitignore 2>/dev/null; then
-  pass ".gitignore ignores local/"
+if grep -qE '^docs/|^\*\*/docs/' .gitignore 2>/dev/null; then
+  pass ".gitignore ignores docs/"
 else
-  bad ".gitignore does not list local/"
+  bad ".gitignore does not list docs/"
 fi
 
-if [[ -f client/.gitignore ]] && grep -qE '^local' client/.gitignore; then
-  pass "client/.gitignore ignores local/"
+# Package-level files should not re-list docs/local (root owns private workspace)
+if [[ -f client/.gitignore ]] && grep -qE '^docs/|^local/' client/.gitignore 2>/dev/null; then
+  caution "client/.gitignore still lists docs/ or local/ — prefer root-only for private workspace"
 else
-  caution "client/.gitignore missing local/ entry"
+  pass "client/.gitignore is package-scoped (no docs/local rules)"
+fi
+
+if [[ -f server/.gitignore ]] && grep -qE '^docs/|^local/' server/.gitignore 2>/dev/null; then
+  caution "server/.gitignore still lists docs/ or local/ — prefer root-only for private workspace"
+else
+  pass "server/.gitignore is package-scoped (no docs/local rules)"
 fi
 
 # --- .env must not be force-tracked patterns ---
@@ -51,13 +58,12 @@ else
   bad "missing server/.env.example"
 fi
 
-# --- secret pattern scan (tracked-ish source; skip node_modules/dist/.env) ---
+# --- secret pattern scan (skip node_modules/dist/docs/.env) ---
 echo
 echo "-- secret / key scan --"
-# NASA DEMO_KEY is public; real keys look like long alnum. Flag known leak pattern + generic api_key= in md/json.
 SECRET_HITS=$(
   find . \
-    \( -path './node_modules' -o -path '*/node_modules/*' -o -path '*/dist/*' -o -path './.git/*' \) -prune -o \
+    \( -path './node_modules' -o -path '*/node_modules/*' -o -path '*/dist/*' -o -path './.git/*' -o -path './docs/*' -o -path '*/docs/*' \) -prune -o \
     -type f \( -name '*.js' -o -name '*.jsx' -o -name '*.ts' -o -name '*.tsx' -o -name '*.md' -o -name '*.html' -o -name '*.json' -o -name '.env.example' \) \
     -print0 2>/dev/null \
   | xargs -0 grep -nE 'api_key=[A-Za-z0-9]{20,}|NASA_API_KEY=[A-Za-z0-9]{20,}' 2>/dev/null \
@@ -68,13 +74,12 @@ SECRET_HITS=$(
 )
 
 if [[ -z "$SECRET_HITS" ]]; then
-  pass "no hard-coded API keys found in source/docs/json (excluding .env)"
+  pass "no hard-coded API keys found in tracked source (excluding .env and docs/)"
 else
   bad "possible hard-coded secrets:"
   echo "$SECRET_HITS" | head -40
 fi
 
-# .env itself should exist only locally — remind rotation if DEMO not used
 if [[ -f server/.env ]]; then
   if grep -qE 'NASA_API_KEY=(DEMO_KEY|your_|YOUR_|change_me)' server/.env 2>/dev/null; then
     pass "server/.env uses placeholder-style key"
@@ -86,14 +91,14 @@ fi
 # --- placeholder production URL ---
 echo
 echo "-- config hygiene --"
-if grep -rn 'production-api-url\.com' client/src --include='*.js' --include='*.jsx' 2>/dev/null | grep -v node_modules; then
+if grep -rn 'production-api-url\.com' client/src --include='*.js' --include='*.jsx' --include='*.ts' --include='*.tsx' 2>/dev/null | grep -v node_modules; then
   caution "placeholder production API URL still in client code"
 else
   pass "no production-api-url.com placeholder in client/src"
 fi
 
 # --- cors open (info) ---
-if grep -q 'app.use(cors())' server/src/index.js 2>/dev/null; then
+if grep -q 'app.use(cors())' server/src/index.ts 2>/dev/null || grep -q 'app.use(cors())' server/src/index.js 2>/dev/null; then
   caution "Express CORS is wide open (ok for local; lock origin before public deploy)"
 fi
 
@@ -106,23 +111,29 @@ if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   else
     bad "server/.env is NOT ignored by git"
   fi
-  if [[ -d client/local ]] || [[ -d local ]]; then
-    if git check-ignore -q client/local 2>/dev/null || git check-ignore -q local 2>/dev/null; then
-      pass "git ignores local/"
+  if [[ -d docs ]]; then
+    if git check-ignore -q docs 2>/dev/null; then
+      pass "git ignores docs/"
     else
-      bad "local/ is NOT ignored by git"
+      bad "docs/ is NOT ignored by git"
     fi
+  else
+    caution "docs/ directory missing (optional private workspace)"
   fi
   if git check-ignore -q client/node_modules 2>/dev/null; then
     pass "git ignores client/node_modules"
   else
     bad "client/node_modules not ignored"
   fi
-  # Would .env be staged?
   if git status --porcelain 2>/dev/null | grep -E '\.env$' | grep -v example; then
     bad ".env appears in git status — unstage and ensure ignore rules"
   else
     pass "no .env in git status porcelain"
+  fi
+  if git status --porcelain 2>/dev/null | grep -E '(^|/)docs(/|$)'; then
+    bad "docs/ appears in git status — should be ignored"
+  else
+    pass "docs/ not listed in git status"
   fi
 else
   caution "not a git repository yet — run: git init (then re-run this script)"
