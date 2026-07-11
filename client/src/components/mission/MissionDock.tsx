@@ -1,6 +1,11 @@
-import { MISSION_STEPS, site } from "../../content/site";
+import type { ReactNode } from "react";
+import {
+  MISSION_STEPS,
+  site,
+  type MissionStepId,
+} from "../../content/site";
 
-function Chip({ children }) {
+function Chip({ children }: { children: ReactNode }) {
   return (
     <span className="inline-block text-[0.68rem] px-1.5 py-0.5 rounded bg-custom-blue/20 text-sky-300 border border-custom-blue/30 mr-1 mb-1">
       {children}
@@ -20,7 +25,7 @@ function BriefingBody() {
           </span>
         )}
       </p>
-      {site.skills?.length > 0 && (
+      {site.skills.length > 0 && (
         <div className="mt-4 flex flex-wrap gap-1">
           {site.skills.map((s) => (
             <Chip key={s}>{s}</Chip>
@@ -31,7 +36,7 @@ function BriefingBody() {
   );
 }
 
-function ProjectsBody({ onEnterLive }) {
+function ProjectsBody({ onEnterLive }: { onEnterLive: () => void }) {
   return (
     <>
       {site.projects.map((p) => (
@@ -88,13 +93,23 @@ function CommsBody() {
   );
 }
 
-export default function MissionDock({ step, onStepChange, onEnterLive }) {
-  const meta = MISSION_STEPS.find((s) => s.id === step) || MISSION_STEPS[0];
+type MissionDockProps = {
+  step: MissionStepId;
+  onStepChange: (step: MissionStepId) => void;
+  onEnterLive: () => void;
+};
+
+export default function MissionDock({
+  step,
+  onStepChange,
+  onEnterLive,
+}: MissionDockProps) {
+  const meta = MISSION_STEPS.find((s) => s.id === step) ?? MISSION_STEPS[0];
 
   let title = site.name;
   let role = site.role;
-  let body = <BriefingBody />;
-  let foot = (
+  let body: ReactNode = <BriefingBody />;
+  let foot: ReactNode = (
     <>
       <button
         type="button"

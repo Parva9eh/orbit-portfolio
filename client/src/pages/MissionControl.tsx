@@ -4,30 +4,36 @@ import React, {
   useCallback,
   useEffect,
   useRef,
+  type ChangeEvent,
 } from "react";
 import { Canvas } from "@react-three/fiber";
 import debounce from "lodash/debounce";
+import type { Asteroid, CelestialItem, Planet } from "@shared";
 import ThreeDScene from "../components/ThreeDScene";
 import { useApiData } from "../hooks/useApiData";
-import { site, MISSION_STEPS } from "../content/site";
-import MissionTopBar from "../components/mission/MissionTopBar";
+import { site, MISSION_STEPS, type MissionStepId } from "../content/site";
+import MissionTopBar, {
+  type ViewMode,
+} from "../components/mission/MissionTopBar";
 import MissionDock from "../components/mission/MissionDock";
 import LiveNeoPanel from "../components/mission/LiveNeoPanel";
 import MissionStatusBar from "../components/mission/MissionStatusBar";
 
 const STEP_IDS = MISSION_STEPS.map((s) => s.id);
 
-function readStepFromHash() {
+function readStepFromHash(): MissionStepId {
   const hash = window.location.hash.replace(/^#/, "");
-  return STEP_IDS.includes(hash) ? hash : "briefing";
+  return STEP_IDS.includes(hash as MissionStepId)
+    ? (hash as MissionStepId)
+    : "briefing";
 }
 
 const MissionControl = React.memo(function MissionControl() {
-  const [step, setStep] = useState(readStepFromHash);
-  const [mode, setMode] = useState(() =>
+  const [step, setStep] = useState<MissionStepId>(readStepFromHash);
+  const [mode, setMode] = useState<ViewMode>(() =>
     readStepFromHash() === "live" ? "live" : "story"
   );
-  const [selectedItem, setSelectedItem] = useState(null);
+  const [selectedItem, setSelectedItem] = useState<CelestialItem | null>(null);
   const [dateRange, setDateRange] = useState({
     start: new Date().toISOString().substring(0, 10),
   });
@@ -35,12 +41,12 @@ const MissionControl = React.memo(function MissionControl() {
   const [searchTerm, setSearchTerm] = useState("");
   const [page, setPage] = useState(1);
   const [showPlanets, setShowPlanets] = useState(true);
-  const previousData = useRef(null);
+  const previousData = useRef<{ data: Asteroid[] } | null>(null);
 
   const isDev = import.meta.env.MODE === "development";
   const liveToolsOpen = mode === "live";
 
-  const goToStep = useCallback((next) => {
+  const goToStep = useCallback((next: MissionStepId) => {
     if (!STEP_IDS.includes(next)) return;
     setStep(next);
     if (next === "live") setMode("live");
@@ -55,7 +61,7 @@ const MissionControl = React.memo(function MissionControl() {
   }, [goToStep]);
 
   const handleModeChange = useCallback(
-    (nextMode) => {
+    (nextMode: ViewMode) => {
       setMode(nextMode);
       if (nextMode === "live") goToStep("live");
     },
@@ -100,13 +106,13 @@ const MissionControl = React.memo(function MissionControl() {
     data: asteroidsData,
     loading: astLoad,
     error: astErr,
-  } = useApiData("/asteroids", asteroidOpts);
+  } = useApiData<Asteroid>("/asteroids", asteroidOpts);
 
   const {
     data: planetsData,
     loading: plLoad,
     error: plErr,
-  } = useApiData("/planets", planetOpts);
+  } = useApiData<Planet>("/planets", planetOpts);
 
   useEffect(() => {
     if (asteroidsData?.data) previousData.current = asteroidsData;
@@ -121,32 +127,36 @@ const MissionControl = React.memo(function MissionControl() {
 
   const debouncedSetSearchTerm = useMemo(
     () =>
-      debounce((value) => {
+      debounce((value: string) => {
         setSearchTerm(value);
         setPage(1);
       }, 300),
     []
   );
 
-  useEffect(() => () => debouncedSetSearchTerm.cancel(), [debouncedSetSearchTerm]);
+  useEffect(
+    () => () => {
+      debouncedSetSearchTerm.cancel();
+    },
+    [debouncedSetSearchTerm]
+  );
 
   const filteredAsteroids = useMemo(() => {
     const currentData =
-      asteroidsData?.data || previousData.current?.data || [];
-    if (!Array.isArray(currentData)) return [];
+      asteroidsData?.data ?? previousData.current?.data ?? [];
     const q = searchTerm.toLowerCase();
     return currentData.filter((neo) =>
       (neo.name || "").toLowerCase().includes(q)
     );
   }, [asteroidsData, searchTerm]);
 
-  const sceneItems = useMemo(() => {
-    const planets = showPlanets ? planetsData?.data || [] : [];
+  const sceneItems = useMemo((): CelestialItem[] => {
+    const planets = showPlanets ? (planetsData?.data ?? []) : [];
     return [...filteredAsteroids, ...planets];
   }, [filteredAsteroids, planetsData, showPlanets]);
 
   const handleItemClick = useCallback(
-    (item) => {
+    (item: CelestialItem) => {
       requestAnimationFrame(() => setSelectedItem(item));
       if (mode !== "live") {
         setMode("live");
@@ -156,7 +166,7 @@ const MissionControl = React.memo(function MissionControl() {
     [mode, goToStep]
   );
 
-  const handleDateChange = useCallback((e) => {
+  const handleDateChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setDateRange((prev) => ({ ...prev, [name]: value }));
     setPage(1);
@@ -168,7 +178,6 @@ const MissionControl = React.memo(function MissionControl() {
 
   return (
     <div className="relative h-[100dvh] w-full overflow-hidden bg-[#070b12] text-white">
-      {/* Full-bleed 3D */}
       <div className="absolute inset-0 bg-black">
         <Canvas
           camera={{ position: [60, 80, 110], fov: 65, near: 0.1, far: 1000 }}
@@ -180,7 +189,7 @@ const MissionControl = React.memo(function MissionControl() {
             onItemClick={handleItemClick}
             selectedItem={selectedItem}
             showPlanets={showPlanets}
-            planetsData={planetsData?.data || []}
+            planetsData={planetsData?.data ?? []}
           />
         </Canvas>
 

@@ -2,7 +2,45 @@
  * Portfolio content — fill these placeholders later.
  * UI reads only from this module so copy stays out of the 3D layer.
  */
-export const site = {
+
+export type MissionStepId = "briefing" | "projects" | "live" | "comms";
+
+export type MissionStep = {
+  id: MissionStepId;
+  label: string;
+  section: string;
+};
+
+export type Project = {
+  id: string;
+  title: string;
+  blurb: string;
+  stack: string[];
+  featured: boolean;
+  live: boolean;
+  href: string | null;
+  repo: string | null;
+};
+
+export type SiteContent = {
+  brand: string;
+  name: string;
+  role: string;
+  tagline: string;
+  summary: string;
+  location: string;
+  openToWork: boolean;
+  email: string;
+  resumeUrl: string;
+  social: {
+    github: string;
+    linkedin: string;
+  };
+  skills: string[];
+  projects: Project[];
+};
+
+export const site: SiteContent = {
   brand: "ORBIT",
   name: "Your Name",
   role: "Frontend · Creative Tech",
@@ -18,14 +56,14 @@ export const site = {
     github: "https://github.com/",
     linkedin: "https://linkedin.com/in/",
   },
-  skills: ["React", "Three.js / R3F", "Node", "Express", "Tailwind", "Vite"],
+  skills: ["React", "Three.js / R3F", "Node", "Express", "Tailwind", "Vite", "TypeScript"],
   projects: [
     {
       id: "astro-explorer",
       title: "Astro Explorer",
       blurb:
         "Interactive 3D near-Earth object visualizer with React Three Fiber, Express caching, and hazard filters — powered by NASA NEO data.",
-      stack: ["React", "R3F", "Express", "NASA API"],
+      stack: ["React", "TypeScript", "R3F", "Express", "NASA API"],
       featured: true,
       live: true,
       href: null,
@@ -54,7 +92,7 @@ export const site = {
   ],
 };
 
-export const MISSION_STEPS = [
+export const MISSION_STEPS: MissionStep[] = [
   { id: "briefing", label: "01 Briefing", section: "Sec 01 · Briefing" },
   { id: "projects", label: "02 Projects", section: "Sec 02 · Projects" },
   { id: "live", label: "03 Live system", section: "Sec 03 · Live system" },

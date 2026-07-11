@@ -1,3 +1,25 @@
+import type { ChangeEvent } from "react";
+import type { Asteroid, CelestialItem } from "@shared";
+import { isAsteroid } from "@shared";
+
+type LiveNeoPanelProps = {
+  searchInput: string;
+  onSearchChange: (value: string) => void;
+  dateStart: string;
+  onDateChange: (e: ChangeEvent<HTMLInputElement>) => void;
+  showHazardous: boolean;
+  onHazardousChange: (value: boolean) => void;
+  showPlanets: boolean;
+  onPlanetsChange: (value: boolean) => void;
+  selectedItem: CelestialItem | null;
+  onClearSelection: () => void;
+  onSelectItem: (item: CelestialItem) => void;
+  asteroids: Asteroid[];
+  page: number;
+  totalPages: number;
+  onPageChange: (page: number) => void;
+};
+
 export default function LiveNeoPanel({
   searchInput,
   onSearchChange,
@@ -14,7 +36,7 @@ export default function LiveNeoPanel({
   page,
   totalPages,
   onPageChange,
-}) {
+}: LiveNeoPanelProps) {
   return (
     <aside
       className="absolute z-20 rounded-xl border border-white/10 bg-[#0f1623]/cc backdrop-blur-md shadow-2xl p-3.5
@@ -67,16 +89,14 @@ export default function LiveNeoPanel({
       {selectedItem && (
         <div className="mb-2.5 p-2.5 rounded-lg bg-black/40 border border-white/5 text-sm">
           <h5 className="font-bold text-white mb-1">{selectedItem.name}</h5>
-          {selectedItem.isHazardous !== undefined && (
+          {isAsteroid(selectedItem) && (
             <p className="text-gray-400 text-xs">
               Hazardous: {selectedItem.isHazardous ? "Yes ⚠" : "No"}
             </p>
           )}
-          {selectedItem.size != null && (
-            <p className="text-gray-400 text-xs">
-              Size: {(selectedItem.size * 1000).toFixed(2)} m
-            </p>
-          )}
+          <p className="text-gray-400 text-xs">
+            Size: {(selectedItem.size * 1000).toFixed(2)} m
+          </p>
           <button
             type="button"
             onClick={onClearSelection}
@@ -88,8 +108,8 @@ export default function LiveNeoPanel({
       )}
 
       <ul className="space-y-1 max-h-36 overflow-y-auto">
-        {asteroids.map((neo, i) => (
-          <li key={neo.name || i}>
+        {asteroids.map((neo) => (
+          <li key={neo.id}>
             <button
               type="button"
               onClick={() => onSelectItem(neo)}
@@ -103,7 +123,9 @@ export default function LiveNeoPanel({
           </li>
         ))}
         {asteroids.length === 0 && (
-          <li className="text-xs text-gray-500 px-1">No asteroids on this page.</li>
+          <li className="text-xs text-gray-500 px-1">
+            No asteroids on this page.
+          </li>
         )}
       </ul>
 

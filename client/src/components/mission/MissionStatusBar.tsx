@@ -1,5 +1,16 @@
-export default function MissionStatusBar({ loading, error, mode }) {
-  const ok = !error;
+import type { ViewMode } from "./MissionTopBar";
+
+type MissionStatusBarProps = {
+  loading: boolean;
+  error: Error | null;
+  mode: ViewMode;
+};
+
+export default function MissionStatusBar({
+  loading,
+  error,
+  mode,
+}: MissionStatusBarProps) {
   return (
     <footer className="absolute bottom-0 left-0 right-0 z-20 flex items-center justify-between gap-3 px-4 py-2 bg-black/80 border-t border-white/10 text-xs text-gray-400">
       <div className="flex items-center gap-2 min-w-0">
@@ -18,9 +29,7 @@ export default function MissionStatusBar({ loading, error, mode }) {
             ? `Signal degraded · ${error.message || "API error"}`
             : loading
               ? "Receiving telemetry…"
-              : ok
-                ? "Systems nominal · mock data ready"
-                : "Standby"}
+              : "Systems nominal · mock data ready"}
         </span>
       </div>
       <div className="hidden sm:block shrink-0 text-gray-500">

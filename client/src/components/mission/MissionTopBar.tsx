@@ -1,4 +1,14 @@
-import { MISSION_STEPS } from "../../content/site";
+import { MISSION_STEPS, type MissionStepId } from "../../content/site";
+
+export type ViewMode = "story" | "live";
+
+type MissionTopBarProps = {
+  brand: string;
+  step: MissionStepId;
+  mode: ViewMode;
+  onStepChange: (step: MissionStepId) => void;
+  onModeChange: (mode: ViewMode) => void;
+};
 
 export default function MissionTopBar({
   brand,
@@ -6,7 +16,7 @@ export default function MissionTopBar({
   mode,
   onStepChange,
   onModeChange,
-}) {
+}: MissionTopBarProps) {
   return (
     <header className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between gap-3 px-4 py-3 md:px-5 bg-gradient-to-b from-black/90 to-transparent">
       <div className="font-bold tracking-widest text-sm md:text-base shrink-0">
