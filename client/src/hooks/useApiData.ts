@@ -1,16 +1,29 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import axios from "axios";
 import type { PaginatedResponse } from "@shared";
 
 export type UseApiDataOptions = {
   cache?: boolean;
   retry?: number;
+  /** When false, skip fetch (keeps prior data if any). */
+  enabled?: boolean;
   params?: Record<string, string | number | boolean | undefined>;
+  /** Client memory TTL in ms (default 5 min). */
+  ttlMs?: number;
 };
 
-type CacheEntry<T> = PaginatedResponse<T>;
+type CacheEntry<T> = {
+  data: PaginatedResponse<T>;
+  expiresAt: number;
+};
 
 const API_CACHE = new Map<string, CacheEntry<unknown>>();
+/** Share one in-flight request per cache key (React StrictMode / dual hooks). */
+const INFLIGHT = new Map<string, Promise<PaginatedResponse<unknown>>>();
+
+const DEFAULT_TTL_MS = 5 * 60 * 1000;
+const MAX_CACHE_ENTRIES = 64;
+const REQUEST_TIMEOUT_MS = 15_000;
 
 function getBaseUrl(): string {
   const isDev = import.meta.env.MODE === "development";
@@ -18,6 +31,60 @@ function getBaseUrl(): string {
     import.meta.env.VITE_API_URL ||
     (isDev ? "http://localhost:8000/api" : "/api")
   );
+}
+
+/** Stable serialize params for cache keys (sorted keys). */
+function stableParamsKey(
+  params: Record<string, string | number | boolean | undefined> | undefined
+): string {
+  const normalized: Record<string, string | number | boolean> = {
+    page: params?.page ?? 1,
+    limit: params?.limit ?? 10,
+  };
+  if (params) {
+    for (const [k, v] of Object.entries(params)) {
+      if (v === undefined) continue;
+      normalized[k] = v;
+    }
+  }
+  return JSON.stringify(
+    Object.keys(normalized)
+      .sort()
+      .reduce<Record<string, string | number | boolean>>((acc, key) => {
+        acc[key] = normalized[key];
+        return acc;
+      }, {})
+  );
+}
+
+function getCached<T>(key: string): PaginatedResponse<T> | undefined {
+  const entry = API_CACHE.get(key) as CacheEntry<T> | undefined;
+  if (!entry) return undefined;
+  if (Date.now() > entry.expiresAt) {
+    API_CACHE.delete(key);
+    return undefined;
+  }
+  // Touch for simple LRU: re-insert moves to Map end
+  API_CACHE.delete(key);
+  API_CACHE.set(key, entry as CacheEntry<unknown>);
+  return entry.data;
+}
+
+function setCached<T>(
+  key: string,
+  data: PaginatedResponse<T>,
+  ttlMs: number
+): void {
+  API_CACHE.set(key, {
+    data: data as PaginatedResponse<unknown>,
+    expiresAt: Date.now() + ttlMs,
+  } as CacheEntry<unknown>);
+
+  while (API_CACHE.size > MAX_CACHE_ENTRIES) {
+    const oldest = API_CACHE.keys().next().value;
+    if (oldest === undefined) break;
+    API_CACHE.delete(oldest);
+  }
 }
 
 export function useApiData<T>(
@@ -36,68 +103,87 @@ export function useApiData<T>(
   const fullUrl = `${getBaseUrl()}${endpoint}`;
 
   const paramsKey = useMemo(
-    () =>
-      JSON.stringify({
-        page: options.params?.page ?? 1,
-        limit: options.params?.limit ?? 10,
-        ...options.params,
-      }),
+    () => stableParamsKey(options.params),
     [options.params]
   );
 
   const resolvedParams = useMemo(() => {
-    const parsed = JSON.parse(paramsKey) as Record<
-      string,
-      string | number | boolean
-    >;
-    return parsed;
+    return JSON.parse(paramsKey) as Record<string, string | number | boolean>;
   }, [paramsKey]);
 
-  const cacheKey = `${fullUrl}${paramsKey}`;
+  const cacheKey = `${fullUrl}?${paramsKey}`;
   const useCache = options.cache !== false;
+  const ttlMs = options.ttlMs ?? DEFAULT_TTL_MS;
   const retryDefault = options.retry ?? (isDev ? 0 : 3);
+  const enabled = options.enabled !== false;
+  const requestId = useRef(0);
 
   useEffect(() => {
+    if (!enabled) {
+      setLoading(false);
+      return;
+    }
+
     let isMounted = true;
-    const shouldFetch = !API_CACHE.has(cacheKey) || !useCache;
-    if (shouldFetch) setLoading(true);
+    const id = ++requestId.current;
+    const cached = useCache ? getCached<T>(cacheKey) : undefined;
+
+    if (cached?.data) {
+      setData(cached);
+      setError(null);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
 
     const fetchData = async (retries: number): Promise<void> => {
-      if (!shouldFetch && isMounted) {
-        const cached = API_CACHE.get(cacheKey) as
-          | PaginatedResponse<T>
-          | undefined;
-        if (cached?.data) {
-          setData(cached);
-          setLoading(false);
-        }
-        return;
-      }
-
       try {
-        const res = await axios.get<PaginatedResponse<T>>(fullUrl, {
-          headers: { "Cache-Control": "no-cache" },
-          params: resolvedParams,
-        });
-        const result = res.data;
-        if (isMounted && result && Array.isArray(result.data)) {
+        let pending = INFLIGHT.get(cacheKey) as
+          | Promise<PaginatedResponse<T>>
+          | undefined;
+
+        if (!pending) {
+          pending = axios
+            .get<PaginatedResponse<T>>(fullUrl, {
+              params: resolvedParams,
+              timeout: REQUEST_TIMEOUT_MS,
+            })
+            .then((res) => res.data)
+            .finally(() => {
+              INFLIGHT.delete(cacheKey);
+            });
+          INFLIGHT.set(
+            cacheKey,
+            pending as Promise<PaginatedResponse<unknown>>
+          );
+        }
+
+        const result = await pending;
+        if (!isMounted || id !== requestId.current) return;
+
+        if (result && Array.isArray(result.data)) {
           setData(result);
           if (useCache) {
-            API_CACHE.set(cacheKey, result as CacheEntry<unknown>);
+            setCached(cacheKey, result, ttlMs);
           }
-        } else if (isMounted) {
+        } else {
           setError(new Error("Invalid API response"));
         }
       } catch (err) {
-        if (isMounted && retries > 0) {
+        if (!isMounted || id !== requestId.current) return;
+        if (retries > 0) {
           console.warn("API call failed, retrying...", err);
           await new Promise((resolve) => setTimeout(resolve, 1000));
           await fetchData(retries - 1);
-        } else if (isMounted) {
+        } else {
           setError(err instanceof Error ? err : new Error(String(err)));
         }
       } finally {
-        if (isMounted) setLoading(false);
+        if (isMounted && id === requestId.current) {
+          setLoading(false);
+        }
       }
     };
 
@@ -106,7 +192,15 @@ export function useApiData<T>(
     return () => {
       isMounted = false;
     };
-  }, [cacheKey, fullUrl, resolvedParams, retryDefault, useCache]);
+  }, [
+    cacheKey,
+    fullUrl,
+    resolvedParams,
+    retryDefault,
+    useCache,
+    enabled,
+    ttlMs,
+  ]);
 
   return { data, loading, error };
 }
