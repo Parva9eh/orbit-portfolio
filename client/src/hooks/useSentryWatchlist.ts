@@ -1,14 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import axios from "axios";
 import type { SentryWatchlist } from "@shared";
-
-function getBaseUrl(): string {
-  const isDev = import.meta.env.MODE === "development";
-  return (
-    import.meta.env.VITE_API_URL ||
-    (isDev ? "http://localhost:8000/api" : "/api")
-  );
-}
+import { getApiBaseUrl } from "../lib/apiBase";
 
 /**
  * P5 — CNEOS Sentry summary (top-N by Palermo scale). Cached on server 6h.
@@ -37,7 +30,7 @@ export function useSentryWatchlist(
     setLoading(true);
 
     axios
-      .get<SentryWatchlist>(`${getBaseUrl()}/sentry`, {
+      .get<SentryWatchlist>(`${getApiBaseUrl()}/sentry`, {
         params: { limit },
         timeout: 15_000,
       })

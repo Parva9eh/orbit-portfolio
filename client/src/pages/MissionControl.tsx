@@ -31,6 +31,8 @@ import type { GuidedTourId } from "../components/mission/GuidedTours";
 import type { SbdbOrbitResult, SentryWatchItem } from "@shared";
 import { designationForSbdb } from "@shared";
 import axios from "axios";
+import { getApiBaseUrl } from "../lib/apiBase";
+import { toThreePath } from "../lib/vec3";
 import {
   asteroidFromSentrySbdb,
   isSentrySceneId,
@@ -59,7 +61,6 @@ import {
   writeOrbitUrl,
   type OrbitUrlState,
 } from "../lib/urlState";
-import * as THREE from "three";
 
 const STEP_IDS = MISSION_STEPS.map((s) => s.id);
 
@@ -68,10 +69,6 @@ function readStepFromHash(): MissionStepId {
   return STEP_IDS.includes(hash as MissionStepId)
     ? (hash as MissionStepId)
     : "briefing";
-}
-
-function toThreePath(points: { x: number; y: number; z: number }[]) {
-  return points.map((p) => new THREE.Vector3(p.x, p.y, p.z));
 }
 
 function findAsteroidByRef(
@@ -596,14 +593,7 @@ const MissionControl = React.memo(function MissionControl() {
     setCompareIds((prev) => prev.filter((x) => x !== id));
   }, []);
 
-  const apiBase = useMemo(
-    () =>
-      import.meta.env.VITE_API_URL ||
-      (import.meta.env.MODE === "development"
-        ? "http://localhost:8000/api"
-        : "/api"),
-    [],
-  );
+  const apiBase = useMemo(() => getApiBaseUrl(), []);
 
   /** Fetch SBDB and inject a synthetic body into the 3D scene. */
   const promoteSentryToScene = useCallback(

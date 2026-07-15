@@ -37,6 +37,7 @@ import { useLazyTexture } from "./scene/useLazyTexture";
 import IssMarker from "./scene/IssMarker";
 import MeasureLine from "./scene/MeasureLine";
 import type { IssPosition } from "@shared";
+import { toThreePath } from "../lib/vec3";
 
 /** Simulation clock (respects pause / speed) — stable actions ref only. */
 function useT() {
@@ -46,10 +47,6 @@ function useT() {
 
 function asteroidDisplayScale(sizeKm: number): number {
   return Math.min(Math.max(sizeKm * 2.2, 0.14), 0.9);
-}
-
-function toThreePath(points: { x: number; y: number; z: number }[]) {
-  return points.map((p) => new THREE.Vector3(p.x, p.y, p.z));
 }
 
 function softOrbitColor(hex?: number): string {

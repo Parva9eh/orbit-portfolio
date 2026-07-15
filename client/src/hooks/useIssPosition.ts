@@ -1,15 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import axios from "axios";
-import type { IssPosition } from "@shared";
-import { DEFAULT_ISS } from "../components/scene/IssMarker";
-
-function getBaseUrl(): string {
-  const isDev = import.meta.env.MODE === "development";
-  return (
-    import.meta.env.VITE_API_URL ||
-    (isDev ? "http://localhost:8000/api" : "/api")
-  );
-}
+import { DEFAULT_ISS, type IssPosition } from "@shared";
+import { getApiBaseUrl } from "../lib/apiBase";
 
 /**
  * P5 — poll ISS when enabled. Seeds DEFAULT_ISS immediately so the LEO ring
@@ -41,7 +33,7 @@ export function useIssPosition(enabled: boolean): {
       const id = ++reqId.current;
       try {
         setLoading(true);
-        const res = await axios.get<IssPosition>(`${getBaseUrl()}/iss`, {
+        const res = await axios.get<IssPosition>(`${getApiBaseUrl()}/iss`, {
           timeout: 8_000,
         });
         if (cancelled || id !== reqId.current) return;

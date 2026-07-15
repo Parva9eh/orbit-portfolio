@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
+import { getApiBaseUrl } from "../lib/apiBase";
 
 export type DonkiSolarBadge = {
   active: boolean;
@@ -11,14 +12,6 @@ export type DonkiSolarBadge = {
   source: string;
   degraded?: boolean;
 };
-
-function getBaseUrl(): string {
-  const isDev = import.meta.env.MODE === "development";
-  return (
-    import.meta.env.VITE_API_URL ||
-    (isDev ? "http://localhost:8000/api" : "/api")
-  );
-}
 
 /** P6 — solar activity badge (DONKI, free NASA key). */
 export function useDonkiSolar(enabled = true): {
@@ -33,7 +26,7 @@ export function useDonkiSolar(enabled = true): {
     let cancelled = false;
     setLoading(true);
     axios
-      .get<DonkiSolarBadge>(`${getBaseUrl()}/donki/solar`, { timeout: 15_000 })
+      .get<DonkiSolarBadge>(`${getApiBaseUrl()}/donki/solar`, { timeout: 15_000 })
       .then((res) => {
         if (!cancelled) setSolar(res.data);
       })
