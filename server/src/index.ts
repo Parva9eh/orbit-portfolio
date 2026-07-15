@@ -2,7 +2,7 @@ import express from "express";
 import cors from "cors";
 import compression from "compression";
 import dotenv from "dotenv";
-import astroRoutes from "./routes/astro.ts";
+import astroRoutes from "./routes/index.ts";
 
 dotenv.config();
 

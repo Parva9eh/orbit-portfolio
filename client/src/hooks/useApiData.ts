@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import axios from "axios";
 import type { PaginatedResponse } from "@shared";
+import { getApiBaseUrl } from "../lib/apiBase";
 
 export type UseApiDataOptions = {
   cache?: boolean;
@@ -24,14 +25,6 @@ const INFLIGHT = new Map<string, Promise<PaginatedResponse<unknown>>>();
 const DEFAULT_TTL_MS = 5 * 60 * 1000;
 const MAX_CACHE_ENTRIES = 64;
 const REQUEST_TIMEOUT_MS = 15_000;
-
-function getBaseUrl(): string {
-  const isDev = import.meta.env.MODE === "development";
-  return (
-    import.meta.env.VITE_API_URL ||
-    (isDev ? "http://localhost:8000/api" : "/api")
-  );
-}
 
 /** Stable serialize params for cache keys (sorted keys). */
 function stableParamsKey(
@@ -100,7 +93,7 @@ export function useApiData<T>(
   const [error, setError] = useState<Error | null>(null);
 
   const isDev = import.meta.env.MODE === "development";
-  const fullUrl = `${getBaseUrl()}${endpoint}`;
+  const fullUrl = `${getApiBaseUrl()}${endpoint}`;
 
   const paramsKey = useMemo(
     () => stableParamsKey(options.params),
