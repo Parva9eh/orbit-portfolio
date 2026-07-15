@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import axios from "axios";
 import { cache, setJsonCache } from "../lib/cache.ts";
-import type { DonkiSolarBadge } from "../lib/astroServices.ts";
+import type { DonkiSolarBadge } from "../lib/donkiTypes.ts";
 
 const router = Router();
 

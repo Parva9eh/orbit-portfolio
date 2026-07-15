@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import type { IssPosition } from "../../../shared/index.ts";
 import { cache, ISS_TTL_SEC, setJsonCache } from "../lib/cache.ts";
-import { fetchIssPosition } from "../lib/astroServices.ts";
+import { fetchIssPosition } from "../lib/iss.ts";
 
 const router = Router();
 
