@@ -37,21 +37,16 @@ import {
   initialLiveMissionState,
   liveMissionReducer,
 } from "../mission/liveMissionState";
+import { LiveMissionProvider } from "../mission/LiveMissionContext";
+import type { LiveMissionTools } from "../mission/LiveMissionContext";
 import { toThreePath } from "../lib/vec3";
 import {
   asteroidFromSentrySbdb,
   isSentrySceneId,
   sentrySceneId,
 } from "../lib/sentryBody";
-import MissionTopBar, {
-  type ViewMode,
-} from "../components/mission/MissionTopBar";
-import MissionDock from "../components/mission/MissionDock";
-import LiveNeoPanel from "../components/mission/LiveNeoPanel";
-import MissionStatusBar from "../components/mission/MissionStatusBar";
-import VizControls, {
-  captureCanvasScreenshot,
-} from "../components/mission/VizControls";
+import MissionShell from "../components/mission/MissionShell";
+import type { ViewMode } from "../components/mission/MissionTopBar";
 import { FrameloopController, SimTicker } from "../sim/SimContext";
 import { useSimActions, useSimSettings } from "../sim/useSim";
 import { SceneBackdrop } from "../components/ThreeDScene";
@@ -898,189 +893,183 @@ const MissionControl = React.memo(function MissionControl() {
   const totalPages = asteroidsData?.pagination?.totalPages ?? 1;
   const currentPage = asteroidsData?.pagination?.currentPage ?? page;
 
+  const liveTools: LiveMissionTools = useMemo(
+    () => ({
+      live,
+      dispatchLive,
+      selectedItem: displaySelected,
+      onClearSelection: handleClearSelection,
+      onSelectItem: handleItemClick,
+      asteroids: filteredAsteroids,
+      catalogAsteroids: asteroidsData?.data ?? [],
+      closestSummary,
+      totalPages,
+      currentPage,
+      loading: astLoad,
+      sbdb: sbdb ?? null,
+      sbdbLoading,
+      sbdbError: sbdbError ?? null,
+      onToggleCompare: handleToggleCompare,
+      onClearCompare: handleClearCompare,
+      onRemoveCompare: handleRemoveCompare,
+      onCopyLink: handleCopyLink,
+      copyLinkStatus,
+      iss: iss ?? null,
+      onShowIssChange: handleShowIssChange,
+      onIssFocusChange: handleIssFocusChange,
+      sentryList: sentryList ?? null,
+      sentryLoading,
+      sentryError: sentryError ?? null,
+      onSentryPickDes: handleSentryPickDes,
+      onShowSentryChange: handleShowSentryChange,
+      sentryBriefSummary,
+      sentryDetail: sentryDetail ?? null,
+      sentryDetailLoading,
+      sentryDetailError: sentryDetailError ?? null,
+      onDismissSentryBrief: handleDismissSentryBrief,
+      onSentryLookupSbdb: handleSentryLookupSbdb,
+      sentrySbdbHint: sbdbHint,
+      onExportSummary: handleExportSummary,
+      exportStatus,
+      rulerApproachMiss: rulerApproachMiss ?? null,
+      onRulerVsEarth: handleRulerVsEarth,
+      onRulerVsSun: handleRulerVsSun,
+      onGuidedTour: handleGuidedTour,
+      onSelectDate: handleSelectDate,
+      onHazardousChange: handleHazardousChange,
+      onPageChange: handlePageChange,
+      onSearchChange: handleSearchChange,
+    }),
+    [
+      live,
+      displaySelected,
+      handleClearSelection,
+      handleItemClick,
+      filteredAsteroids,
+      asteroidsData,
+      closestSummary,
+      totalPages,
+      currentPage,
+      astLoad,
+      sbdb,
+      sbdbLoading,
+      sbdbError,
+      handleToggleCompare,
+      handleClearCompare,
+      handleRemoveCompare,
+      handleCopyLink,
+      copyLinkStatus,
+      iss,
+      handleShowIssChange,
+      handleIssFocusChange,
+      sentryList,
+      sentryLoading,
+      sentryError,
+      handleSentryPickDes,
+      handleShowSentryChange,
+      sentryBriefSummary,
+      sentryDetail,
+      sentryDetailLoading,
+      sentryDetailError,
+      handleDismissSentryBrief,
+      handleSentryLookupSbdb,
+      sbdbHint,
+      handleExportSummary,
+      exportStatus,
+      rulerApproachMiss,
+      handleRulerVsEarth,
+      handleRulerVsSun,
+      handleGuidedTour,
+      handleSelectDate,
+      handleHazardousChange,
+      handlePageChange,
+      handleSearchChange,
+    ],
+  );
+
+  const canvas = (
+    <>
+      <Canvas
+        camera={{ position: [48, 52, 88], fov: 48, near: 0.1, far: 2500 }}
+        dpr={[1, 2]}
+        gl={{
+          antialias: true,
+          powerPreference: "high-performance",
+          alpha: false,
+          preserveDrawingBuffer: true,
+        }}
+        onCreated={({ gl }) => {
+          gl.setClearColor("#010308", 1);
+        }}
+        className="!absolute inset-0 bg-[#010308]"
+      >
+        <SceneBackdrop />
+        <SimTicker />
+        <FrameloopController />
+        <Suspense fallback={null}>
+          <ThreeDScene
+            items={sceneItems}
+            onItemClick={handleItemClick}
+            selectedItem={displaySelected}
+            showPlanets={showPlanets}
+            planetsData={planetsData?.data ?? []}
+            compareOrbits={compareOrbits}
+            showIss={showIss && mode === "live"}
+            iss={iss}
+            issFocus={issFocus && showIss && mode === "live"}
+            measureAId={
+              rulerEnabled && rulerA
+                ? rulerA.kind === "sun"
+                  ? "sun"
+                  : rulerA.id
+                : null
+            }
+            measureBId={
+              rulerEnabled && rulerB
+                ? rulerB.kind === "sun"
+                  ? "sun"
+                  : rulerB.id
+                : null
+            }
+            onMeasureDistance={(d) =>
+              dispatchLive({ type: "SET_RULER_DIST", value: d })
+            }
+          />
+        </Suspense>
+      </Canvas>
+      {loading && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/40 pointer-events-none z-10">
+          <span className="text-white/90 text-sm tracking-wide">
+            Receiving telemetry…
+          </span>
+        </div>
+      )}
+    </>
+  );
+
   return (
-    <div className="relative h-[100dvh] w-full overflow-hidden bg-[#070b12] text-white">
-      <div className="absolute inset-0 bg-black">
-        <Canvas
-          camera={{ position: [48, 52, 88], fov: 48, near: 0.1, far: 2500 }}
-          dpr={[1, 2]}
-          gl={{
-            antialias: true,
-            powerPreference: "high-performance",
-            alpha: false,
-            preserveDrawingBuffer: true,
-          }}
-          onCreated={({ gl }) => {
-            gl.setClearColor("#010308", 1);
-          }}
-          className="!absolute inset-0 bg-[#010308]"
-        >
-          <SceneBackdrop />
-          <SimTicker />
-          <FrameloopController />
-          <Suspense fallback={null}>
-            <ThreeDScene
-              items={sceneItems}
-              onItemClick={handleItemClick}
-              selectedItem={displaySelected}
-              showPlanets={showPlanets}
-              planetsData={planetsData?.data ?? []}
-              compareOrbits={compareOrbits}
-              showIss={showIss && mode === "live"}
-              iss={iss}
-              issFocus={issFocus && showIss && mode === "live"}
-              measureAId={
-                rulerEnabled && rulerA
-                  ? rulerA.kind === "sun"
-                    ? "sun"
-                    : rulerA.id
-                  : null
-              }
-              measureBId={
-                rulerEnabled && rulerB
-                  ? rulerB.kind === "sun"
-                    ? "sun"
-                    : rulerB.id
-                  : null
-              }
-              onMeasureDistance={(d) => dispatchLive({ type: "SET_RULER_DIST", value: d })}
-            />
-          </Suspense>
-        </Canvas>
-
-        {loading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/40 pointer-events-none z-10">
-            <span className="text-white/90 text-sm tracking-wide">
-              Receiving telemetry…
-            </span>
-          </div>
-        )}
-      </div>
-
-      <MissionTopBar
+    <LiveMissionProvider value={liveTools}>
+      <MissionShell
         brand={site.brand}
         step={step}
         mode={mode}
         onStepChange={goToStep}
         onModeChange={handleModeChange}
-      />
-
-      <MissionDock
-        step={step}
-        onStepChange={goToStep}
         onEnterLive={enterLive}
+        liveToolsOpen={liveToolsOpen}
+        canvas={canvas}
+        status={{
+          loading,
+          error,
+          selectedItem: displaySelected,
+          iss: iss ?? null,
+          showIss: showIss && mode === "live",
+          issFocus,
+          solar: solar ?? null,
+          rulerLabel: rulerLabel ?? null,
+        }}
       />
-
-      {/*
-        Chrome stack:
-        - Mobile: Live Neo above dock; viz controls bottom-center
-        - Desktop: right rail — Live Neo flexes above VizControls (bottom-right)
-      */}
-      <div
-        className="absolute z-30 pointer-events-none inset-0
-          md:inset-auto md:right-4 md:top-16 md:bottom-14 md:w-[min(320px,90vw)]
-          md:flex md:flex-col md:gap-2"
-      >
-        {liveToolsOpen && (
-          <div
-            className="pointer-events-auto
-              absolute left-3 right-3 bottom-[calc(42vh+3.5rem)] h-[min(38vh,calc(100dvh-14rem))]
-              md:static md:left-auto md:right-auto md:bottom-auto md:h-auto
-              md:flex-1 md:min-h-0"
-          >
-            <LiveNeoPanel
-              embedded
-              searchInput={searchTerm}
-              onSearchChange={handleSearchChange}
-              dateStart={approachDate}
-              onSelectDate={handleSelectDate}
-              showHazardous={showHazardous}
-              onHazardousChange={handleHazardousChange}
-              showPlanets={showPlanets}
-              onPlanetsChange={(v) => dispatchLive({ type: "SET_SHOW_PLANETS", value: v })}
-              selectedItem={displaySelected}
-              onClearSelection={handleClearSelection}
-              onSelectItem={handleItemClick}
-              asteroids={filteredAsteroids}
-              catalogAsteroids={asteroidsData?.data ?? []}
-              closestSummary={closestSummary}
-              page={currentPage}
-              totalPages={totalPages}
-              onPageChange={handlePageChange}
-              loading={astLoad}
-              sbdb={sbdb}
-              sbdbLoading={sbdbLoading}
-              sbdbError={sbdbError}
-              compareIds={compareIds}
-              onToggleCompare={handleToggleCompare}
-              onClearCompare={handleClearCompare}
-              onRemoveCompare={handleRemoveCompare}
-              onCopyLink={handleCopyLink}
-              copyLinkStatus={copyLinkStatus}
-              showIss={showIss}
-              onShowIssChange={handleShowIssChange}
-              iss={iss}
-              issFocus={issFocus}
-              onIssFocusChange={handleIssFocusChange}
-              showSentry={showSentry}
-              onShowSentryChange={handleShowSentryChange}
-              sentryList={sentryList}
-              sentryLoading={sentryLoading}
-              sentryError={sentryError}
-              onSentryPickDes={handleSentryPickDes}
-              sentryBriefDes={sentryBriefDes}
-              sentryBriefSummary={sentryBriefSummary}
-              sentryDetail={sentryDetail}
-              sentryDetailLoading={sentryDetailLoading}
-              sentryDetailError={sentryDetailError}
-              onDismissSentryBrief={handleDismissSentryBrief}
-              onSentryLookupSbdb={handleSentryLookupSbdb}
-              sentrySbdbHint={sbdbHint}
-              onExportSummary={handleExportSummary}
-              exportStatus={exportStatus}
-              maxMissLd={maxMissLd}
-              onMaxMissLdChange={(v) => dispatchLive({ type: "SET_MAX_MISS_LD", value: v })}
-              minDiameterM={minDiameterM}
-              onMinDiameterMChange={(v) => dispatchLive({ type: "SET_MIN_DIAMETER_M", value: v })}
-              rulerEnabled={rulerEnabled}
-              onRulerEnabledChange={(v) => dispatchLive({ type: "SET_RULER_ENABLED", value: v })}
-              rulerA={rulerA}
-              rulerB={rulerB}
-              rulerSceneDist={rulerSceneDist}
-              rulerApproachMiss={rulerApproachMiss}
-              onRulerClear={() => {
-                dispatchLive({ type: "SET_RULER_A", value: null });
-                dispatchLive({ type: "SET_RULER_B", value: null });
-                dispatchLive({ type: "SET_RULER_DIST", value: null });
-              }}
-              onRulerVsEarth={handleRulerVsEarth}
-              onRulerVsSun={handleRulerVsSun}
-              onGuidedTour={handleGuidedTour}
-            />
-          </div>
-        )}
-        <div
-          className={`pointer-events-auto
-            absolute bottom-12 left-1/2 -translate-x-1/2 max-w-[min(92vw,300px)]
-            md:static md:translate-x-0 md:left-auto md:bottom-auto md:max-w-none md:shrink-0
-            ${liveToolsOpen ? "" : "md:mt-auto md:self-end md:w-[min(300px,90vw)]"}`}
-        >
-          <VizControls embedded onScreenshot={captureCanvasScreenshot} />
-        </div>
-      </div>
-
-      <MissionStatusBar
-        loading={loading}
-        error={error}
-        mode={mode}
-        selectedItem={displaySelected}
-        iss={iss}
-        showIss={showIss && mode === "live"}
-        issFocus={issFocus}
-        solar={solar}
-        rulerLabel={rulerLabel}
-      />
-    </div>
+    </LiveMissionProvider>
   );
 });
 
