@@ -12,18 +12,12 @@ import { Canvas } from "@react-three/fiber";
 import type { Asteroid, CelestialItem, Planet } from "@shared";
 import {
   formatExportSummary,
-  formatMiss,
-  formatRulerDistance,
   isAsteroid,
-  mergeAsteroidWithSbdb,
-  sampleOrbitPath,
   designationForSbdb,
   type SbdbOrbitResult,
   type SentryWatchItem,
 } from "@shared";
-import ThreeDScene, {
-  type CompareOrbitSpec,
-} from "../components/ThreeDScene";
+import ThreeDScene from "../components/ThreeDScene";
 import { useApiData } from "../hooks/useApiData";
 import { useSbdbOrbit } from "../hooks/useSbdbOrbit";
 import { useIssPosition } from "../hooks/useIssPosition";
@@ -40,7 +34,6 @@ import {
   liveMissionReducer,
 } from "./liveMissionState";
 import type { LiveMissionTools } from "./LiveMissionContext";
-import { toThreePath } from "../lib/vec3";
 import {
   asteroidFromSentrySbdb,
   isSentrySceneId,
@@ -50,15 +43,24 @@ import type { ViewMode } from "../components/mission/MissionTopBar";
 import { FrameloopController, SimTicker } from "../sim/SimContext";
 import { useSimActions, useSimSettings } from "../sim/useSim";
 import { SceneBackdrop } from "../components/scene/SceneBackdrop";
-import { qualitySettings, scalePosition } from "../sim/simUtils";
-import { closestAsteroid, sortAsteroidsByMiss } from "../lib/neoSort";
+import { qualitySettings } from "../sim/simUtils";
+import { closestAsteroid } from "../lib/neoSort";
 import {
-  COMPARE_COLORS,
   copyShareUrl,
   parseOrbitUrl,
   writeOrbitUrl,
   type OrbitUrlState,
 } from "../lib/urlState";
+import { findAsteroidByRef } from "./findAsteroid";
+import {
+  buildCompareOrbits,
+  buildSceneItems,
+  closestSummaryLine,
+  filterAsteroids,
+  resolveDisplaySelected,
+  rulerApproachMissLabel,
+  rulerStatusLabel,
+} from "./liveDerived";
 
 const STEP_IDS = MISSION_STEPS.map((s) => s.id);
 
@@ -67,20 +69,6 @@ function readStepFromHash(): MissionStepId {
   return STEP_IDS.includes(hash as MissionStepId)
     ? (hash as MissionStepId)
     : "briefing";
-}
-
-export function findAsteroidByRef(
-  list: Asteroid[],
-  ref: string
-): Asteroid | undefined {
-  const q = ref.trim().toLowerCase();
-  return list.find(
-    (a) =>
-      a.id.toLowerCase() === q ||
-      a.designation?.toLowerCase() === q ||
-      a.name.replace(/[()]/g, "").trim().toLowerCase() === q ||
-      a.name.toLowerCase() === q
-  );
 }
 
 export type MissionControlModel = {
@@ -298,27 +286,16 @@ export function useMissionControlModel(): MissionControlModel {
     dispatchLive({ type: "SET_PAGE", page: serverPage });
   }, [asteroidsData]);
 
-  const filteredAsteroids = useMemo(() => {
-    let list = asteroidsData?.data ?? [];
-    const q = searchTerm.trim().toLowerCase();
-    if (q) {
-      list = list.filter((neo) => (neo.name || "").toLowerCase().includes(q));
-    }
-    if (maxMissLd != null) {
-      list = list.filter(
-        (neo) =>
-          neo.approach?.missLd != null && neo.approach.missLd <= maxMissLd
-      );
-    }
-    if (minDiameterM != null) {
-      const minKm = minDiameterM / 1000;
-      list = list.filter((neo) => {
-        const d = neo.diameterKmMax ?? neo.diameterKmMin ?? neo.size;
-        return d != null && d >= minKm;
-      });
-    }
-    return sortAsteroidsByMiss(list);
-  }, [asteroidsData, searchTerm, maxMissLd, minDiameterM]);
+  const filteredAsteroids = useMemo(
+    () =>
+      filterAsteroids(
+        asteroidsData?.data,
+        searchTerm,
+        maxMissLd,
+        minDiameterM
+      ),
+    [asteroidsData, searchTerm, maxMissLd, minDiameterM]
+  );
 
   // Resolve deep-link neo + compare when catalog arrives
   useEffect(() => {
@@ -349,15 +326,10 @@ export function useMissionControlModel(): MissionControlModel {
     [filteredAsteroids],
   );
 
-  const closestSummary = useMemo(() => {
-    if (!closest) return null;
-    const miss = closest.approach
-      ? formatMiss(closest.approach.missLd, closest.approach.missKm, {
-          compact: true,
-        })
-      : "—";
-    return `${closest.name} @ ${miss}`;
-  }, [closest]);
+  const closestSummary = useMemo(
+    () => closestSummaryLine(closest),
+    [closest]
+  );
 
   const selectedAsteroid = useMemo(
     () =>
@@ -387,112 +359,58 @@ export function useMissionControlModel(): MissionControlModel {
 
   const { solar } = useDonkiSolar(true);
 
-  const rulerApproachMiss = useMemo(() => {
-    if (!rulerA || !rulerB) return null;
-    const ids = [rulerA, rulerB];
-    const neoEnd = ids.find(
-      (p) => p.kind === "body" && p.id !== "planet:Earth"
-    );
-    const earthEnd = ids.find(
-      (p) =>
-        (p.kind === "body" && p.id === "planet:Earth") ||
-        p.name === "Earth"
-    );
-    if (!neoEnd || !earthEnd || neoEnd.kind !== "body") return null;
-    const pool = [
-      ...(asteroidsData?.data ?? []),
-      ...(sentrySceneBody ? [sentrySceneBody] : []),
-    ];
-    const neo = pool.find((a) => a.id === neoEnd.id);
-    if (!neo?.approach) return null;
-    return formatMiss(neo.approach.missLd, neo.approach.missKm);
-  }, [rulerA, rulerB, asteroidsData, sentrySceneBody]);
+  const rulerApproachMiss = useMemo(
+    () =>
+      rulerApproachMissLabel(
+        rulerA,
+        rulerB,
+        asteroidsData?.data ?? [],
+        sentrySceneBody
+      ),
+    [rulerA, rulerB, asteroidsData, sentrySceneBody]
+  );
 
-  const rulerLabel = useMemo(() => {
-    if (!rulerEnabled || rulerSceneDist == null) return null;
-    return formatRulerDistance(rulerSceneDist).label;
-  }, [rulerEnabled, rulerSceneDist]);
+  const rulerLabel = useMemo(
+    () => rulerStatusLabel(rulerEnabled, rulerSceneDist),
+    [rulerEnabled, rulerSceneDist]
+  );
 
-  const displaySelected = useMemo((): CelestialItem | null => {
-    if (!selectedItem) return null;
-    if (!isAsteroid(selectedItem)) return selectedItem;
-    // Prefer synthetic Sentry body if selected
-    if (
-      sentrySceneBody &&
-      selectedItem.id === sentrySceneBody.id
-    ) {
-      return sentrySceneBody;
-    }
-    if (!sbdb?.found) return selectedItem;
-    return mergeAsteroidWithSbdb(selectedItem, sbdb);
-  }, [selectedItem, sbdb, sentrySceneBody]);
+  const displaySelected = useMemo(
+    () => resolveDisplaySelected(selectedItem, sbdb, sentrySceneBody),
+    [selectedItem, sbdb, sentrySceneBody]
+  );
 
-  const sceneItems = useMemo((): CelestialItem[] => {
-    const planets = showPlanets ? planetsData?.data ?? [] : [];
-    let neos = showAsteroids ? [...filteredAsteroids] : [];
-    if (
-      displaySelected &&
-      isAsteroid(displaySelected) &&
-      displaySelected.orbitSource === "sbdb"
-    ) {
-      neos = neos.map((n) =>
-        n.id === displaySelected.id ? displaySelected : n,
-      );
-    }
-    // Inject Sentry-only body (not on NeoWs page) into the scene
-    if (
-      sentrySceneBody &&
-      !neos.some((n) => n.id === sentrySceneBody.id)
-    ) {
-      neos = [...neos, sentrySceneBody];
-    }
-    return [...neos, ...planets];
-  }, [
-    filteredAsteroids,
-    planetsData,
-    showPlanets,
-    showAsteroids,
-    displaySelected,
-    sentrySceneBody,
-  ]);
+  const sceneItems = useMemo(
+    () =>
+      buildSceneItems({
+        showPlanets,
+        showAsteroids,
+        planets: planetsData?.data ?? [],
+        filteredAsteroids,
+        displaySelected,
+        sentrySceneBody,
+      }),
+    [
+      filteredAsteroids,
+      planetsData,
+      showPlanets,
+      showAsteroids,
+      displaySelected,
+      sentrySceneBody,
+    ]
+  );
 
-  /** P4 compare orbit polylines for the scene */
-  const compareOrbits = useMemo((): CompareOrbitSpec[] => {
-    if (compareIds.length === 0) return [];
-    const pool = asteroidsData?.data ?? [];
-    const colors = [COMPARE_COLORS.a, COMPARE_COLORS.b] as const;
-    const out: CompareOrbitSpec[] = [];
-    for (let i = 0; i < compareIds.length; i++) {
-      const id = compareIds[i];
-      let a = pool.find((x) => x.id === id);
-      if (
-        displaySelected &&
-        isAsteroid(displaySelected) &&
-        displaySelected.id === id
-      ) {
-        a = displaySelected;
-      }
-      if (!a) continue;
-      out.push({
-        id: a.id,
-        name: a.name,
-        hazardous: a.isHazardous,
-        color: colors[i] ?? COMPARE_COLORS.a,
-        points: toThreePath(
-          sampleOrbitPath(a.orbit, q.orbitSegments).map((pt) =>
-            scalePosition(pt, trueScale),
-          ),
-        ),
-      });
-    }
-    return out;
-  }, [
-    compareIds,
-    asteroidsData,
-    displaySelected,
-    q.orbitSegments,
-    trueScale,
-  ]);
+  const compareOrbits = useMemo(
+    () =>
+      buildCompareOrbits({
+        compareIds,
+        catalog: asteroidsData?.data ?? [],
+        displaySelected,
+        orbitSegments: q.orbitSegments,
+        trueScale,
+      }),
+    [compareIds, asteroidsData, displaySelected, q.orbitSegments, trueScale]
+  );
 
   // Sync deep-link search params (live briefing only)
   useEffect(() => {
