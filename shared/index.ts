@@ -61,4 +61,4 @@ export type {
   SentryWatchlist,
   SentryDetail,
 } from "./live";
-export { SENTRY_EDU_NOTE } from "./live";
+export { SENTRY_EDU_NOTE, DEFAULT_ISS } from "./live";

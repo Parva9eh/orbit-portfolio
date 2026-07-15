@@ -11,6 +11,19 @@ export type IssPosition = {
   source: "wheretheiss.at" | "open-notify" | "mock";
 };
 
+/**
+ * Seed until live /api/iss responds — ring + craft can mount immediately.
+ * Kept in shared so hooks do not import from presentation components.
+ */
+export const DEFAULT_ISS: IssPosition = {
+  lat: 28.5,
+  lon: -80.6,
+  altKm: 420,
+  velocityKmS: 7.66,
+  timestampMs: 0,
+  source: "mock",
+};
+
 export type SentryWatchItem = {
   des: string;
   fullname: string;
