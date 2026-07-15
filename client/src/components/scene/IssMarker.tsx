@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import type { IssPosition } from "@shared";
+import { DEFAULT_ISS, type IssPosition } from "@shared";
 import { useSimActions } from "../../sim/useSim";
+
+/** Re-export for any UI that still imported the seed from the marker. */
+export { DEFAULT_ISS };
 
 const DEG = Math.PI / 180;
 /** Real ISS inclination (schematic). */
@@ -12,16 +15,6 @@ const ISS_INCLINATION = 51.6 * DEG;
  * Compressed so motion is readable like planet paths on their rings.
  */
 const ISS_PERIOD_SIM = 9.5;
-
-/** Used until live /api/iss responds — ring + craft show immediately. */
-export const DEFAULT_ISS: IssPosition = {
-  lat: 28.5,
-  lon: -80.6,
-  altKm: 420,
-  velocityKmS: 7.66,
-  timestampMs: 0,
-  source: "mock",
-};
 
 /**
  * Point on a circular LEO in Earth-local frame.

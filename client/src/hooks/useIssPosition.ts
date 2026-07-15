@@ -1,15 +1,6 @@
-import { useEffect, useRef, useState } from "react";
-import axios from "axios";
-import type { IssPosition } from "@shared";
-import { DEFAULT_ISS } from "../components/scene/IssMarker";
-
-function getBaseUrl(): string {
-  const isDev = import.meta.env.MODE === "development";
-  return (
-    import.meta.env.VITE_API_URL ||
-    (isDev ? "http://localhost:8000/api" : "/api")
-  );
-}
+import { useMemo } from "react";
+import { DEFAULT_ISS, type IssPosition } from "@shared";
+import { useApiResource } from "./useApiResource";
 
 /**
  * P5 — poll ISS when enabled. Seeds DEFAULT_ISS immediately so the LEO ring
@@ -20,50 +11,18 @@ export function useIssPosition(enabled: boolean): {
   loading: boolean;
   error: Error | null;
 } {
-  const [iss, setIss] = useState<IssPosition | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
-  const reqId = useRef(0);
-
-  useEffect(() => {
-    if (!enabled) {
-      setLoading(false);
-      // Keep last sample optional; clear so re-enable re-seeds
-      return;
-    }
-
-    // Immediate placeholder so scene can draw ring + craft without waiting
-    setIss((prev) => prev ?? { ...DEFAULT_ISS, timestampMs: Date.now() });
-
-    let cancelled = false;
-
-    const tick = async () => {
-      const id = ++reqId.current;
-      try {
-        setLoading(true);
-        const res = await axios.get<IssPosition>(`${getBaseUrl()}/iss`, {
-          timeout: 8_000,
-        });
-        if (cancelled || id !== reqId.current) return;
-        setIss(res.data);
-        setError(null);
-      } catch (err) {
-        if (cancelled || id !== reqId.current) return;
-        setError(err instanceof Error ? err : new Error(String(err)));
-        // Keep DEFAULT_ISS / last good — do not clear to null
-        setIss((prev) => prev ?? { ...DEFAULT_ISS, timestampMs: Date.now() });
-      } finally {
-        if (!cancelled && id === reqId.current) setLoading(false);
-      }
-    };
-
-    void tick();
-    const timer = window.setInterval(() => void tick(), 10_000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(timer);
-    };
-  }, [enabled]);
-
-  return { iss, loading, error };
+  const seed = useMemo<IssPosition>(
+    () => ({ ...DEFAULT_ISS, timestampMs: Date.now() }),
+    // re-seed when re-enabled so timestamp is fresh
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [enabled]
+  );
+  const { data, loading, error } = useApiResource<IssPosition>({
+    path: "/iss",
+    enabled,
+    pollMs: 10_000,
+    timeoutMs: 8_000,
+    initialData: seed,
+  });
+  return { iss: data, loading, error };
 }

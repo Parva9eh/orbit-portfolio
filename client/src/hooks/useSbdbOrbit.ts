@@ -2,14 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Asteroid, SbdbOrbitResult } from "@shared";
 import { designationForSbdb } from "@shared";
 import axios from "axios";
-
-function getBaseUrl(): string {
-  const isDev = import.meta.env.MODE === "development";
-  return (
-    import.meta.env.VITE_API_URL ||
-    (isDev ? "http://localhost:8000/api" : "/api")
-  );
-}
+import { getApiBaseUrl } from "../lib/apiBase";
 
 /** Client memory of successful SBDB results (session). */
 const SBDB_MEM = new Map<string, SbdbOrbitResult>();
@@ -79,7 +72,7 @@ export function useSbdbOrbit(asteroid: Asteroid | null): {
         let pending = SBDB_INFLIGHT.get(key);
         if (!pending) {
           pending = axios
-            .get<SbdbOrbitResult>(`${getBaseUrl()}/sbdb`, {
+            .get<SbdbOrbitResult>(`${getApiBaseUrl()}/sbdb`, {
               params: { sstr },
               timeout: 12_000,
             })

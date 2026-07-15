@@ -4,6 +4,7 @@ import React, {
   useCallback,
   useEffect,
   useRef,
+  useReducer,
   Suspense,
 } from "react";
 import { Canvas } from "@react-three/fiber";
@@ -31,35 +32,33 @@ import type { GuidedTourId } from "../components/mission/GuidedTours";
 import type { SbdbOrbitResult, SentryWatchItem } from "@shared";
 import { designationForSbdb } from "@shared";
 import axios from "axios";
+import { getApiBaseUrl } from "../lib/apiBase";
+import {
+  initialLiveMissionState,
+  liveMissionReducer,
+} from "../mission/liveMissionState";
+import { LiveMissionProvider } from "../mission/LiveMissionContext";
+import type { LiveMissionTools } from "../mission/LiveMissionContext";
+import { toThreePath } from "../lib/vec3";
 import {
   asteroidFromSentrySbdb,
   isSentrySceneId,
   sentrySceneId,
 } from "../lib/sentryBody";
-import MissionTopBar, {
-  type ViewMode,
-} from "../components/mission/MissionTopBar";
-import MissionDock from "../components/mission/MissionDock";
-import LiveNeoPanel from "../components/mission/LiveNeoPanel";
-import MissionStatusBar from "../components/mission/MissionStatusBar";
-import VizControls, {
-  captureCanvasScreenshot,
-} from "../components/mission/VizControls";
+import MissionShell from "../components/mission/MissionShell";
+import type { ViewMode } from "../components/mission/MissionTopBar";
 import { FrameloopController, SimTicker } from "../sim/SimContext";
 import { useSimActions, useSimSettings } from "../sim/useSim";
 import { SceneBackdrop } from "../components/ThreeDScene";
 import { qualitySettings, scalePosition } from "../sim/simUtils";
-import { todayIsoLocal } from "../lib/dateUtils";
 import { closestAsteroid, sortAsteroidsByMiss } from "../lib/neoSort";
 import {
   COMPARE_COLORS,
   copyShareUrl,
   parseOrbitUrl,
-  toggleCompareId,
   writeOrbitUrl,
   type OrbitUrlState,
 } from "../lib/urlState";
-import * as THREE from "three";
 
 const STEP_IDS = MISSION_STEPS.map((s) => s.id);
 
@@ -68,10 +67,6 @@ function readStepFromHash(): MissionStepId {
   return STEP_IDS.includes(hash as MissionStepId)
     ? (hash as MissionStepId)
     : "briefing";
-}
-
-function toThreePath(points: { x: number; y: number; z: number }[]) {
-  return points.map((p) => new THREE.Vector3(p.x, p.y, p.z));
 }
 
 function findAsteroidByRef(
@@ -107,47 +102,38 @@ const MissionControl = React.memo(function MissionControl() {
     return readStepFromHash() === "live" ? "live" : "story";
   });
   const [selectedItem, setSelectedItem] = useState<CelestialItem | null>(null);
-  const [approachDate, setApproachDate] = useState(
-    () => initialUrl.date ?? todayIsoLocal(),
+  const [live, dispatchLive] = useReducer(
+    liveMissionReducer,
+    initialUrl,
+    initialLiveMissionState,
   );
-  const [showHazardous, setShowHazardous] = useState(
-    () => initialUrl.hazardous ?? false,
-  );
-  const [searchTerm, setSearchTerm] = useState("");
-  const [page, setPage] = useState(1);
-  const [showPlanets, setShowPlanets] = useState(true);
-  /** P4 — up to 2 NEO ids for dual orbit compare */
-  const [compareIds, setCompareIds] = useState<string[]>(
-    () => initialUrl.compare ?? [],
-  );
+  const {
+    approachDate,
+    page,
+    searchTerm,
+    showHazardous,
+    showPlanets,
+    compareIds,
+    showIss,
+    issFocus,
+    showSentry,
+    sentryBriefDes,
+    maxMissLd,
+    minDiameterM,
+    rulerEnabled,
+    rulerA,
+    rulerB,
+    rulerSceneDist,
+  } = live;
+
   const [copyLinkStatus, setCopyLinkStatus] = useState<
     "idle" | "copied" | "failed"
   >("idle");
-  /** P5 live layers */
-  const [showIss, setShowIss] = useState(
-    () => Boolean(initialUrl.issFocus) || false,
-  );
-  const [issFocus, setIssFocus] = useState(() => initialUrl.issFocus ?? false);
-  const [showSentry, setShowSentry] = useState(
-    () => Boolean(initialUrl.sentry) || false,
-  );
-  /** Sentry object not on NeoWs page — soft briefing (no browser alert) */
-  const [sentryBriefDes, setSentryBriefDes] = useState<string | null>(
-    () => initialUrl.sentry ?? null,
-  );
   const [sentryBriefSummary, setSentryBriefSummary] =
     useState<SentryWatchItem | null>(null);
   const [sbdbHint, setSbdbHint] = useState<string | null>(null);
   /** Synthetic body from Sentry+SBDB drawn in the scene */
   const [sentrySceneBody, setSentrySceneBody] = useState<Asteroid | null>(null);
-
-  /** P6 filters + ruler + export */
-  const [maxMissLd, setMaxMissLd] = useState<number | null>(null);
-  const [minDiameterM, setMinDiameterM] = useState<number | null>(null);
-  const [rulerEnabled, setRulerEnabled] = useState(false);
-  const [rulerA, setRulerA] = useState<RulerEndpoint | null>(null);
-  const [rulerB, setRulerB] = useState<RulerEndpoint | null>(null);
-  const [rulerSceneDist, setRulerSceneDist] = useState<number | null>(null);
   const [exportStatus, setExportStatus] = useState<
     "idle" | "copied" | "failed"
   >("idle");
@@ -172,13 +158,11 @@ const MissionControl = React.memo(function MissionControl() {
       setViewScale(initialUrl.view ?? "nearEarth");
       setCameraMode("tour");
       if (initialUrl.issFocus) {
-        setShowIss(true);
-        setIssFocus(true);
+        dispatchLive({ type: "SET_ISS", show: true, focus: true });
         setViewScale("nearEarth");
       }
       if (initialUrl.sentry) {
-        setShowSentry(true);
-        setSentryBriefDes(initialUrl.sentry);
+        dispatchLive({ type: "SET_SENTRY", show: true, briefDes: initialUrl.sentry });
       }
     } else if (initialUrl.view) {
       setViewScale(initialUrl.view);
@@ -208,7 +192,7 @@ const MissionControl = React.memo(function MissionControl() {
         setCameraMode("tour");
       } else {
         setSelectedItem((cur) => (cur && isAsteroid(cur) ? null : cur));
-        setCompareIds([]);
+        dispatchLive({ type: "CLEAR_COMPARE" });
         setViewScale("system");
         setCameraMode("tour");
         if (step === "live") goToStep("briefing");
@@ -232,10 +216,10 @@ const MissionControl = React.memo(function MissionControl() {
     const onPop = () => {
       const p = parseOrbitUrl();
       if (p.mode === "live" || p.mode === "story") setMode(p.mode);
-      if (p.date) setApproachDate(p.date);
+      if (p.date) dispatchLive({ type: "SET_DATE", date: p.date });
       if (p.view) setViewScale(p.view);
-      if (p.hazardous != null) setShowHazardous(p.hazardous);
-      if (p.compare) setCompareIds(p.compare);
+      if (p.hazardous != null) dispatchLive({ type: "SET_HAZARDOUS", value: p.hazardous });
+      if (p.compare) dispatchLive({ type: "SET_COMPARE", ids: p.compare });
       if (p.neo) pendingNeo.current = p.neo;
       else setSelectedItem((cur) => (cur && isAsteroid(cur) ? null : cur));
     };
@@ -283,7 +267,7 @@ const MissionControl = React.memo(function MissionControl() {
   useEffect(() => {
     if (!asteroidsData?.pagination) return;
     const serverPage = asteroidsData.pagination.currentPage;
-    setPage((p) => (serverPage !== p ? serverPage : p));
+    dispatchLive({ type: "SET_PAGE", page: serverPage });
   }, [asteroidsData]);
 
   const filteredAsteroids = useMemo(() => {
@@ -327,7 +311,7 @@ const MissionControl = React.memo(function MissionControl() {
         .map((id) => findAsteroidByRef(list, id)?.id)
         .filter((id): id is string => Boolean(id))
         .slice(0, 2);
-      if (resolved.length) setCompareIds(resolved);
+      if (resolved.length) dispatchLive({ type: "SET_COMPARE", ids: resolved });
       pendingCompare.current = [];
     }
   }, [asteroidsData, setCameraMode]);
@@ -530,14 +514,14 @@ const MissionControl = React.memo(function MissionControl() {
           name: item.name,
         };
         if (!rulerA || (rulerA && rulerB)) {
-          setRulerA(ep);
-          setRulerB(null);
-          setRulerSceneDist(null);
+          dispatchLive({ type: "SET_RULER_A", value: ep });
+          dispatchLive({ type: "SET_RULER_B", value: null });
+          dispatchLive({ type: "SET_RULER_DIST", value: null });
         } else if (
           rulerA.kind === "sun" ||
           (rulerA.kind === "body" && rulerA.id !== item.id)
         ) {
-          setRulerB(ep);
+          dispatchLive({ type: "SET_RULER_B", value: ep });
         }
         // Still select for inspector context
       }
@@ -545,13 +529,13 @@ const MissionControl = React.memo(function MissionControl() {
       // Switching to a normal body clears any Sentry-only inject
       if (isAsteroid(item) && !isSentrySceneId(item.id)) {
         setSentrySceneBody(null);
-        setSentryBriefDes(null);
+        dispatchLive({ type: "SET_SENTRY_BRIEF", des: null });
         setSentryBriefSummary(null);
         setSbdbHint(null);
       }
       setSelectedItem(item);
       if (!rulerEnabled) setCameraMode("focus");
-      setIssFocus(false);
+      dispatchLive({ type: "SET_ISS_FOCUS", value: false });
       window.dispatchEvent(new Event("orbit-sfx-click"));
       if (mode !== "live") {
         setMode("live");
@@ -562,48 +546,41 @@ const MissionControl = React.memo(function MissionControl() {
   );
 
   const handleSelectDate = useCallback((iso: string) => {
-    setApproachDate(iso);
-    setPage(1);
+    dispatchLive({ type: "SET_DATE", date: iso });
+    dispatchLive({ type: "SET_PAGE", page: 1 });
     setSelectedItem((cur) => (cur && isAsteroid(cur) ? null : cur));
   }, []);
 
   const handleHazardousChange = useCallback((value: boolean) => {
-    setShowHazardous(value);
-    setPage(1);
-    setSearchTerm("");
+    dispatchLive({ type: "SET_HAZARDOUS", value: value });
+    dispatchLive({ type: "SET_PAGE", page: 1 });
+    dispatchLive({ type: "SET_SEARCH", value: "" });
     setSelectedItem((cur) => (cur && isAsteroid(cur) ? null : cur));
   }, []);
 
   const handlePageChange = useCallback((next: number) => {
-    setPage(Math.max(1, next));
+    dispatchLive({ type: "SET_PAGE", page: Math.max(1, next) });
     setSelectedItem((cur) => (cur && isAsteroid(cur) ? null : cur));
   }, []);
 
   const handleSearchChange = useCallback((value: string) => {
-    setSearchTerm(value);
+    dispatchLive({ type: "SET_SEARCH", value });
   }, []);
 
   const handleToggleCompare = useCallback(() => {
     if (!displaySelected || !isAsteroid(displaySelected)) return;
-    setCompareIds((prev) => toggleCompareId(prev, displaySelected.id));
+    dispatchLive({ type: "TOGGLE_COMPARE", id: displaySelected.id });
   }, [displaySelected]);
 
   const handleClearCompare = useCallback(() => {
-    setCompareIds([]);
+    dispatchLive({ type: "CLEAR_COMPARE" });
   }, []);
 
   const handleRemoveCompare = useCallback((id: string) => {
-    setCompareIds((prev) => prev.filter((x) => x !== id));
+    dispatchLive({ type: "REMOVE_COMPARE", id });
   }, []);
 
-  const apiBase = useMemo(
-    () =>
-      import.meta.env.VITE_API_URL ||
-      (import.meta.env.MODE === "development"
-        ? "http://localhost:8000/api"
-        : "/api"),
-    [],
-  );
+  const apiBase = useMemo(() => getApiBaseUrl(), []);
 
   /** Fetch SBDB and inject a synthetic body into the 3D scene. */
   const promoteSentryToScene = useCallback(
@@ -631,7 +608,7 @@ const MissionControl = React.memo(function MissionControl() {
         setSentrySceneBody(body);
         setSelectedItem(body);
         setCameraMode("focus");
-        setIssFocus(false);
+        dispatchLive({ type: "SET_ISS_FOCUS", value: false });
         setViewScale("system"); // SBDB orbits are heliocentric — System view is honest
         setSbdbHint(
           `Drawn in scene · SBDB a=${data.aAu?.toFixed(3)} au · e=${data.e?.toFixed(3)} · System view recommended`,
@@ -655,12 +632,12 @@ const MissionControl = React.memo(function MissionControl() {
         findAsteroidByRef(pool, des) ||
         findAsteroidByRef(pool, sentrySceneId(des));
       if (found) {
-        setSentryBriefDes(null);
+        dispatchLive({ type: "SET_SENTRY_BRIEF", des: null });
         setSentryBriefSummary(null);
         setSbdbHint(null);
         setSelectedItem(found);
         setCameraMode("focus");
-        setIssFocus(false);
+        dispatchLive({ type: "SET_ISS_FOCUS", value: false });
         return;
       }
       // Soft briefing + auto-promote to scene via SBDB (production path)
@@ -671,7 +648,7 @@ const MissionControl = React.memo(function MissionControl() {
             it.fullname.toLowerCase().includes(des.toLowerCase()),
         ) ?? null;
       setSentryBriefSummary(summary);
-      setSentryBriefDes(des);
+      dispatchLive({ type: "SET_SENTRY_BRIEF", des: des });
       setSbdbHint(null);
       void promoteSentryToScene(des, summary);
     },
@@ -689,13 +666,13 @@ const MissionControl = React.memo(function MissionControl() {
     if (!pendingSentry.current || mode !== "live") return;
     const des = pendingSentry.current;
     pendingSentry.current = null;
-    setShowSentry(true);
+    dispatchLive({ type: "SET_SENTRY", show: true });
     handleSentryPickDes(des);
   }, [mode, handleSentryPickDes]);
 
   /** Full reset when leaving Sentry briefing / unselecting a Sentry-only body */
   const resetSentryState = useCallback(() => {
-    setSentryBriefDes(null);
+    dispatchLive({ type: "SET_SENTRY_BRIEF", des: null });
     setSentryBriefSummary(null);
     setSbdbHint(null);
     setSentrySceneBody(null);
@@ -713,7 +690,7 @@ const MissionControl = React.memo(function MissionControl() {
     setSelectedItem((cur) => {
       if (cur && isAsteroid(cur) && isSentrySceneId(cur.id)) {
         // Clearing a Sentry-only selection = full reset
-        setSentryBriefDes(null);
+        dispatchLive({ type: "SET_SENTRY_BRIEF", des: null });
         setSentryBriefSummary(null);
         setSbdbHint(null);
         setSentrySceneBody(null);
@@ -730,8 +707,8 @@ const MissionControl = React.memo(function MissionControl() {
 
   const handleShowIssChange = useCallback(
     (v: boolean) => {
-      setShowIss(v);
-      if (!v) setIssFocus(false);
+      dispatchLive({ type: "SET_ISS", show: v });
+      if (!v) dispatchLive({ type: "SET_ISS_FOCUS", value: false });
       else {
         setViewScale("nearEarth");
       }
@@ -741,14 +718,14 @@ const MissionControl = React.memo(function MissionControl() {
 
   const handleIssFocusChange = useCallback(
     (v: boolean) => {
-      setIssFocus(v);
+      dispatchLive({ type: "SET_ISS_FOCUS", value: v });
       if (v) {
-        setShowIss(true);
+        dispatchLive({ type: "SET_ISS", show: true });
         setViewScale("nearEarth");
         setCameraMode("tour");
         // Leaving Sentry selection when entering ISS focus
         setSelectedItem(null);
-        setSentryBriefDes(null);
+        dispatchLive({ type: "SET_SENTRY_BRIEF", des: null });
         setSentryBriefSummary(null);
         setSbdbHint(null);
         setSentrySceneBody(null);
@@ -759,10 +736,10 @@ const MissionControl = React.memo(function MissionControl() {
 
   const handleShowSentryChange = useCallback(
     (v: boolean) => {
-      setShowSentry(v);
+      dispatchLive({ type: "SET_SENTRY", show: v });
       if (!v) {
         // Closing Sentry panel = full reset of Sentry inject
-        setSentryBriefDes(null);
+        dispatchLive({ type: "SET_SENTRY_BRIEF", des: null });
         setSentryBriefSummary(null);
         setSbdbHint(null);
         setSentrySceneBody(null);
@@ -803,7 +780,7 @@ const MissionControl = React.memo(function MissionControl() {
 
   const handleGuidedTour = useCallback(
     (id: GuidedTourId) => {
-      setIssFocus(false);
+      dispatchLive({ type: "SET_ISS_FOCUS", value: false });
       if (id === "closest") {
         setMode("live");
         goToStep("live");
@@ -819,7 +796,7 @@ const MissionControl = React.memo(function MissionControl() {
         setMode("live");
         goToStep("live");
         setViewScale("nearEarth");
-        setShowIss(false);
+        dispatchLive({ type: "SET_ISS", show: false });
         setCameraMode("tour");
         const earth = planetsData?.data?.find((p) => p.name === "Earth");
         if (earth) setSelectedItem(earth);
@@ -835,7 +812,7 @@ const MissionControl = React.memo(function MissionControl() {
         setMode("live");
         goToStep("live");
         setViewScale("system");
-        setIssFocus(false);
+        dispatchLive({ type: "SET_ISS_FOCUS", value: false });
         setCameraMode("tour");
         setSelectedItem(null);
         return;
@@ -860,24 +837,24 @@ const MissionControl = React.memo(function MissionControl() {
 
   const handleRulerVsEarth = useCallback(() => {
     if (!displaySelected || !isAsteroid(displaySelected)) return;
-    setRulerEnabled(true);
-    setRulerA({
+    dispatchLive({ type: "SET_RULER_ENABLED", value: true });
+    dispatchLive({ type: "SET_RULER_A", value: {
       kind: "body",
       id: displaySelected.id,
       name: displaySelected.name,
-    });
-    setRulerB({ kind: "body", id: "planet:Earth", name: "Earth" });
+    } });
+    dispatchLive({ type: "SET_RULER_B", value: { kind: "body", id: "planet:Earth", name: "Earth" } });
   }, [displaySelected]);
 
   const handleRulerVsSun = useCallback(() => {
     if (!displaySelected) return;
-    setRulerEnabled(true);
-    setRulerA({
+    dispatchLive({ type: "SET_RULER_ENABLED", value: true });
+    dispatchLive({ type: "SET_RULER_A", value: {
       kind: "body",
       id: displaySelected.id,
       name: displaySelected.name,
-    });
-    setRulerB({ kind: "sun", name: "Sun" });
+    } });
+    dispatchLive({ type: "SET_RULER_B", value: { kind: "sun", name: "Sun" } });
   }, [displaySelected]);
 
   const handleCopyLink = useCallback(async () => {
@@ -916,189 +893,183 @@ const MissionControl = React.memo(function MissionControl() {
   const totalPages = asteroidsData?.pagination?.totalPages ?? 1;
   const currentPage = asteroidsData?.pagination?.currentPage ?? page;
 
+  const liveTools: LiveMissionTools = useMemo(
+    () => ({
+      live,
+      dispatchLive,
+      selectedItem: displaySelected,
+      onClearSelection: handleClearSelection,
+      onSelectItem: handleItemClick,
+      asteroids: filteredAsteroids,
+      catalogAsteroids: asteroidsData?.data ?? [],
+      closestSummary,
+      totalPages,
+      currentPage,
+      loading: astLoad,
+      sbdb: sbdb ?? null,
+      sbdbLoading,
+      sbdbError: sbdbError ?? null,
+      onToggleCompare: handleToggleCompare,
+      onClearCompare: handleClearCompare,
+      onRemoveCompare: handleRemoveCompare,
+      onCopyLink: handleCopyLink,
+      copyLinkStatus,
+      iss: iss ?? null,
+      onShowIssChange: handleShowIssChange,
+      onIssFocusChange: handleIssFocusChange,
+      sentryList: sentryList ?? null,
+      sentryLoading,
+      sentryError: sentryError ?? null,
+      onSentryPickDes: handleSentryPickDes,
+      onShowSentryChange: handleShowSentryChange,
+      sentryBriefSummary,
+      sentryDetail: sentryDetail ?? null,
+      sentryDetailLoading,
+      sentryDetailError: sentryDetailError ?? null,
+      onDismissSentryBrief: handleDismissSentryBrief,
+      onSentryLookupSbdb: handleSentryLookupSbdb,
+      sentrySbdbHint: sbdbHint,
+      onExportSummary: handleExportSummary,
+      exportStatus,
+      rulerApproachMiss: rulerApproachMiss ?? null,
+      onRulerVsEarth: handleRulerVsEarth,
+      onRulerVsSun: handleRulerVsSun,
+      onGuidedTour: handleGuidedTour,
+      onSelectDate: handleSelectDate,
+      onHazardousChange: handleHazardousChange,
+      onPageChange: handlePageChange,
+      onSearchChange: handleSearchChange,
+    }),
+    [
+      live,
+      displaySelected,
+      handleClearSelection,
+      handleItemClick,
+      filteredAsteroids,
+      asteroidsData,
+      closestSummary,
+      totalPages,
+      currentPage,
+      astLoad,
+      sbdb,
+      sbdbLoading,
+      sbdbError,
+      handleToggleCompare,
+      handleClearCompare,
+      handleRemoveCompare,
+      handleCopyLink,
+      copyLinkStatus,
+      iss,
+      handleShowIssChange,
+      handleIssFocusChange,
+      sentryList,
+      sentryLoading,
+      sentryError,
+      handleSentryPickDes,
+      handleShowSentryChange,
+      sentryBriefSummary,
+      sentryDetail,
+      sentryDetailLoading,
+      sentryDetailError,
+      handleDismissSentryBrief,
+      handleSentryLookupSbdb,
+      sbdbHint,
+      handleExportSummary,
+      exportStatus,
+      rulerApproachMiss,
+      handleRulerVsEarth,
+      handleRulerVsSun,
+      handleGuidedTour,
+      handleSelectDate,
+      handleHazardousChange,
+      handlePageChange,
+      handleSearchChange,
+    ],
+  );
+
+  const canvas = (
+    <>
+      <Canvas
+        camera={{ position: [48, 52, 88], fov: 48, near: 0.1, far: 2500 }}
+        dpr={[1, 2]}
+        gl={{
+          antialias: true,
+          powerPreference: "high-performance",
+          alpha: false,
+          preserveDrawingBuffer: true,
+        }}
+        onCreated={({ gl }) => {
+          gl.setClearColor("#010308", 1);
+        }}
+        className="!absolute inset-0 bg-[#010308]"
+      >
+        <SceneBackdrop />
+        <SimTicker />
+        <FrameloopController />
+        <Suspense fallback={null}>
+          <ThreeDScene
+            items={sceneItems}
+            onItemClick={handleItemClick}
+            selectedItem={displaySelected}
+            showPlanets={showPlanets}
+            planetsData={planetsData?.data ?? []}
+            compareOrbits={compareOrbits}
+            showIss={showIss && mode === "live"}
+            iss={iss}
+            issFocus={issFocus && showIss && mode === "live"}
+            measureAId={
+              rulerEnabled && rulerA
+                ? rulerA.kind === "sun"
+                  ? "sun"
+                  : rulerA.id
+                : null
+            }
+            measureBId={
+              rulerEnabled && rulerB
+                ? rulerB.kind === "sun"
+                  ? "sun"
+                  : rulerB.id
+                : null
+            }
+            onMeasureDistance={(d) =>
+              dispatchLive({ type: "SET_RULER_DIST", value: d })
+            }
+          />
+        </Suspense>
+      </Canvas>
+      {loading && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/40 pointer-events-none z-10">
+          <span className="text-white/90 text-sm tracking-wide">
+            Receiving telemetry…
+          </span>
+        </div>
+      )}
+    </>
+  );
+
   return (
-    <div className="relative h-[100dvh] w-full overflow-hidden bg-[#070b12] text-white">
-      <div className="absolute inset-0 bg-black">
-        <Canvas
-          camera={{ position: [48, 52, 88], fov: 48, near: 0.1, far: 2500 }}
-          dpr={[1, 2]}
-          gl={{
-            antialias: true,
-            powerPreference: "high-performance",
-            alpha: false,
-            preserveDrawingBuffer: true,
-          }}
-          onCreated={({ gl }) => {
-            gl.setClearColor("#010308", 1);
-          }}
-          className="!absolute inset-0 bg-[#010308]"
-        >
-          <SceneBackdrop />
-          <SimTicker />
-          <FrameloopController />
-          <Suspense fallback={null}>
-            <ThreeDScene
-              items={sceneItems}
-              onItemClick={handleItemClick}
-              selectedItem={displaySelected}
-              showPlanets={showPlanets}
-              planetsData={planetsData?.data ?? []}
-              compareOrbits={compareOrbits}
-              showIss={showIss && mode === "live"}
-              iss={iss}
-              issFocus={issFocus && showIss && mode === "live"}
-              measureAId={
-                rulerEnabled && rulerA
-                  ? rulerA.kind === "sun"
-                    ? "sun"
-                    : rulerA.id
-                  : null
-              }
-              measureBId={
-                rulerEnabled && rulerB
-                  ? rulerB.kind === "sun"
-                    ? "sun"
-                    : rulerB.id
-                  : null
-              }
-              onMeasureDistance={setRulerSceneDist}
-            />
-          </Suspense>
-        </Canvas>
-
-        {loading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/40 pointer-events-none z-10">
-            <span className="text-white/90 text-sm tracking-wide">
-              Receiving telemetry…
-            </span>
-          </div>
-        )}
-      </div>
-
-      <MissionTopBar
+    <LiveMissionProvider value={liveTools}>
+      <MissionShell
         brand={site.brand}
         step={step}
         mode={mode}
         onStepChange={goToStep}
         onModeChange={handleModeChange}
-      />
-
-      <MissionDock
-        step={step}
-        onStepChange={goToStep}
         onEnterLive={enterLive}
+        liveToolsOpen={liveToolsOpen}
+        canvas={canvas}
+        status={{
+          loading,
+          error,
+          selectedItem: displaySelected,
+          iss: iss ?? null,
+          showIss: showIss && mode === "live",
+          issFocus,
+          solar: solar ?? null,
+          rulerLabel: rulerLabel ?? null,
+        }}
       />
-
-      {/*
-        Chrome stack:
-        - Mobile: Live Neo above dock; viz controls bottom-center
-        - Desktop: right rail — Live Neo flexes above VizControls (bottom-right)
-      */}
-      <div
-        className="absolute z-30 pointer-events-none inset-0
-          md:inset-auto md:right-4 md:top-16 md:bottom-14 md:w-[min(320px,90vw)]
-          md:flex md:flex-col md:gap-2"
-      >
-        {liveToolsOpen && (
-          <div
-            className="pointer-events-auto
-              absolute left-3 right-3 bottom-[calc(42vh+3.5rem)] h-[min(38vh,calc(100dvh-14rem))]
-              md:static md:left-auto md:right-auto md:bottom-auto md:h-auto
-              md:flex-1 md:min-h-0"
-          >
-            <LiveNeoPanel
-              embedded
-              searchInput={searchTerm}
-              onSearchChange={handleSearchChange}
-              dateStart={approachDate}
-              onSelectDate={handleSelectDate}
-              showHazardous={showHazardous}
-              onHazardousChange={handleHazardousChange}
-              showPlanets={showPlanets}
-              onPlanetsChange={setShowPlanets}
-              selectedItem={displaySelected}
-              onClearSelection={handleClearSelection}
-              onSelectItem={handleItemClick}
-              asteroids={filteredAsteroids}
-              catalogAsteroids={asteroidsData?.data ?? []}
-              closestSummary={closestSummary}
-              page={currentPage}
-              totalPages={totalPages}
-              onPageChange={handlePageChange}
-              loading={astLoad}
-              sbdb={sbdb}
-              sbdbLoading={sbdbLoading}
-              sbdbError={sbdbError}
-              compareIds={compareIds}
-              onToggleCompare={handleToggleCompare}
-              onClearCompare={handleClearCompare}
-              onRemoveCompare={handleRemoveCompare}
-              onCopyLink={handleCopyLink}
-              copyLinkStatus={copyLinkStatus}
-              showIss={showIss}
-              onShowIssChange={handleShowIssChange}
-              iss={iss}
-              issFocus={issFocus}
-              onIssFocusChange={handleIssFocusChange}
-              showSentry={showSentry}
-              onShowSentryChange={handleShowSentryChange}
-              sentryList={sentryList}
-              sentryLoading={sentryLoading}
-              sentryError={sentryError}
-              onSentryPickDes={handleSentryPickDes}
-              sentryBriefDes={sentryBriefDes}
-              sentryBriefSummary={sentryBriefSummary}
-              sentryDetail={sentryDetail}
-              sentryDetailLoading={sentryDetailLoading}
-              sentryDetailError={sentryDetailError}
-              onDismissSentryBrief={handleDismissSentryBrief}
-              onSentryLookupSbdb={handleSentryLookupSbdb}
-              sentrySbdbHint={sbdbHint}
-              onExportSummary={handleExportSummary}
-              exportStatus={exportStatus}
-              maxMissLd={maxMissLd}
-              onMaxMissLdChange={setMaxMissLd}
-              minDiameterM={minDiameterM}
-              onMinDiameterMChange={setMinDiameterM}
-              rulerEnabled={rulerEnabled}
-              onRulerEnabledChange={setRulerEnabled}
-              rulerA={rulerA}
-              rulerB={rulerB}
-              rulerSceneDist={rulerSceneDist}
-              rulerApproachMiss={rulerApproachMiss}
-              onRulerClear={() => {
-                setRulerA(null);
-                setRulerB(null);
-                setRulerSceneDist(null);
-              }}
-              onRulerVsEarth={handleRulerVsEarth}
-              onRulerVsSun={handleRulerVsSun}
-              onGuidedTour={handleGuidedTour}
-            />
-          </div>
-        )}
-        <div
-          className={`pointer-events-auto
-            absolute bottom-12 left-1/2 -translate-x-1/2 max-w-[min(92vw,300px)]
-            md:static md:translate-x-0 md:left-auto md:bottom-auto md:max-w-none md:shrink-0
-            ${liveToolsOpen ? "" : "md:mt-auto md:self-end md:w-[min(300px,90vw)]"}`}
-        >
-          <VizControls embedded onScreenshot={captureCanvasScreenshot} />
-        </div>
-      </div>
-
-      <MissionStatusBar
-        loading={loading}
-        error={error}
-        mode={mode}
-        selectedItem={displaySelected}
-        iss={iss}
-        showIss={showIss && mode === "live"}
-        issFocus={issFocus}
-        solar={solar}
-        rulerLabel={rulerLabel}
-      />
-    </div>
+    </LiveMissionProvider>
   );
 });
 

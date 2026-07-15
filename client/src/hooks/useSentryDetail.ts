@@ -2,14 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import axios from "axios";
 import type { SentryDetail, SentryWatchItem } from "@shared";
 import { SENTRY_EDU_NOTE } from "@shared";
-
-function getBaseUrl(): string {
-  const isDev = import.meta.env.MODE === "development";
-  return (
-    import.meta.env.VITE_API_URL ||
-    (isDev ? "http://localhost:8000/api" : "/api")
-  );
-}
+import { getApiBaseUrl } from "../lib/apiBase";
 
 function detailFromSummary(
   des: string,
@@ -80,7 +73,7 @@ export function useSentryDetail(
 
     axios
       .get<SentryDetail>(
-        `${getBaseUrl()}/sentry/${encodeURIComponent(des)}`,
+        `${getApiBaseUrl()}/sentry/${encodeURIComponent(des)}`,
         { timeout: 15_000, validateStatus: (s) => s >= 200 && s < 500 }
       )
       .then((res) => {
