@@ -38,182 +38,35 @@ import IssMarker from "./scene/IssMarker";
 import MeasureLine from "./scene/MeasureLine";
 import type { IssPosition } from "@shared";
 import { toThreePath } from "../lib/vec3";
+import {
+  makeCircleSprite,
+  makeFlareTexture,
+  makeRingTexture,
+  makeStreakTexture,
+  makeTextSpriteTexture,
+} from "./scene/textures/canvasSprites";
+import { MW_VERT, MW_FRAG } from "./scene/shaders/milkyWay";
+import {
+  SUN_RADIUS,
+  SUN_VERT,
+  SUN_FRAG,
+  CHROMA_VERT,
+  CHROMA_FRAG,
+} from "./scene/shaders/sun";
+import { EARTH_VERT, EARTH_FRAG } from "./scene/shaders/earth";
+import { JUPITER_VERT, JUPITER_FRAG } from "./scene/shaders/jupiter";
+import {
+  asteroidDisplayScale,
+  softOrbitColor,
+  labelWorldHeight,
+  isNearSunDisc,
+} from "./scene/math/sceneHelpers";
 
 /** Simulation clock (respects pause / speed) — stable actions ref only. */
 function useT() {
   const { simTimeRef } = useSimActions();
   return () => simTimeRef.current;
 }
-
-function asteroidDisplayScale(sizeKm: number): number {
-  return Math.min(Math.max(sizeKm * 2.2, 0.14), 0.9);
-}
-
-function softOrbitColor(hex?: number): string {
-  if (hex == null) return "#8aa8c4";
-  const c = new THREE.Color(hex);
-  const hsl = { h: 0, s: 0, l: 0 };
-  c.getHSL(hsl);
-  // Keep a hint of planet hue but bright enough for System view
-  c.setHSL(hsl.h, Math.min(hsl.s * 0.35 + 0.12, 0.4), 0.62);
-  return `#${c.getHexString()}`;
-}
-
-/* ------------------------------------------------------------------ */
-/*  Sky + circular point sprites (avoids WebGL square points)          */
-/* ------------------------------------------------------------------ */
-
-/** Soft disc texture so Points render as stars, not squares. */
-function makeCircleSprite(size = 64, soft = true): THREE.CanvasTexture {
-  const c = document.createElement("canvas");
-  c.width = c.height = size;
-  const ctx = c.getContext("2d")!;
-  const r = size / 2;
-  const g = ctx.createRadialGradient(r, r, 0, r, r, r);
-  if (soft) {
-    g.addColorStop(0.0, "rgba(255,255,255,1)");
-    g.addColorStop(0.15, "rgba(255,255,255,0.95)");
-    g.addColorStop(0.4, "rgba(255,255,255,0.35)");
-    g.addColorStop(0.7, "rgba(255,255,255,0.08)");
-    g.addColorStop(1.0, "rgba(255,255,255,0)");
-  } else {
-    g.addColorStop(0.0, "rgba(255,255,255,1)");
-    g.addColorStop(0.5, "rgba(255,255,255,0.9)");
-    g.addColorStop(0.85, "rgba(255,255,255,0.15)");
-    g.addColorStop(1.0, "rgba(255,255,255,0)");
-  }
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, size, size);
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.premultiplyAlpha = true;
-  tex.flipY = false;
-  tex.minFilter = THREE.LinearFilter;
-  tex.magFilter = THREE.LinearFilter;
-  tex.generateMipmaps = false;
-  tex.needsUpdate = true;
-  return tex;
-}
-
-/**
- * Soft white→transparent radial glow for lens flare.
- * Must never contain opaque black (that reads as the flashing square).
- */
-function makeFlareTexture(
-  size = 256,
-  stops: Array<{ t: number; a: number }>
-): THREE.CanvasTexture {
-  const c = document.createElement("canvas");
-  c.width = c.height = size;
-  const ctx = c.getContext("2d")!;
-  // Clear to fully transparent (not black)
-  ctx.clearRect(0, 0, size, size);
-  const r = size / 2;
-  const g = ctx.createRadialGradient(r, r, 0, r, r, r);
-  for (const s of stops) {
-    g.addColorStop(s.t, `rgba(255,255,255,${s.a})`);
-  }
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, size, size);
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.premultiplyAlpha = true;
-  tex.flipY = false;
-  tex.minFilter = THREE.LinearFilter;
-  tex.magFilter = THREE.LinearFilter;
-  tex.generateMipmaps = false;
-  tex.needsUpdate = true;
-  return tex;
-}
-
-/** Soft annular ring for photographic lens ghosts (no opaque fill). */
-function makeRingTexture(size = 128): THREE.CanvasTexture {
-  const c = document.createElement("canvas");
-  c.width = c.height = size;
-  const ctx = c.getContext("2d")!;
-  ctx.clearRect(0, 0, size, size);
-  const r = size / 2;
-  const g = ctx.createRadialGradient(r, r, r * 0.28, r, r, r * 0.92);
-  g.addColorStop(0.0, "rgba(255,255,255,0)");
-  g.addColorStop(0.35, "rgba(255,255,255,0.08)");
-  g.addColorStop(0.55, "rgba(255,255,255,0.42)");
-  g.addColorStop(0.72, "rgba(255,255,255,0.18)");
-  g.addColorStop(1.0, "rgba(255,255,255,0)");
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, size, size);
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.premultiplyAlpha = true;
-  tex.flipY = false;
-  tex.minFilter = THREE.LinearFilter;
-  tex.magFilter = THREE.LinearFilter;
-  tex.generateMipmaps = false;
-  tex.needsUpdate = true;
-  return tex;
-}
-
-function makeStreakTexture(w = 512, h = 64): THREE.CanvasTexture {
-  const c = document.createElement("canvas");
-  c.width = w;
-  c.height = h;
-  const ctx = c.getContext("2d")!;
-  ctx.clearRect(0, 0, w, h);
-  const g = ctx.createLinearGradient(0, h / 2, w, h / 2);
-  g.addColorStop(0.0, "rgba(255,255,255,0)");
-  g.addColorStop(0.35, "rgba(255,255,255,0.35)");
-  g.addColorStop(0.5, "rgba(255,255,255,0.7)");
-  g.addColorStop(0.65, "rgba(255,255,255,0.35)");
-  g.addColorStop(1.0, "rgba(255,255,255,0)");
-  ctx.fillStyle = g;
-  // Vertical soft falloff
-  for (let y = 0; y < h; y++) {
-    const v = 1 - Math.abs(y / h - 0.5) * 2;
-    const a = Math.pow(Math.max(0, v), 2.2);
-    ctx.globalAlpha = a;
-    ctx.fillRect(0, y, w, 1);
-  }
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.premultiplyAlpha = true;
-  tex.flipY = false;
-  tex.minFilter = THREE.LinearFilter;
-  tex.magFilter = THREE.LinearFilter;
-  tex.generateMipmaps = false;
-  tex.needsUpdate = true;
-  return tex;
-}
-
-/**
- * Photographic milky-way sky: lift only the luminous band, keep empty sky black
- * so Cinematic looks rich without a light-blue wash.
- */
-const MW_VERT = /* glsl */ `
-varying vec2 vUv;
-void main() {
-  vUv = uv;
-  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-}
-`;
-const MW_FRAG = /* glsl */ `
-uniform sampler2D uMap;
-uniform float uHasMap;
-uniform float uBoost;
-varying vec2 vUv;
-void main() {
-  if (uHasMap < 0.5) {
-    gl_FragColor = vec4(0.004, 0.01, 0.02, 1.0);
-    return;
-  }
-  vec3 t = texture2D(uMap, vUv).rgb;
-  float lum = dot(t, vec3(0.299, 0.587, 0.114));
-  // Keep dark sky black; lift band + faint structure for a natural milky way
-  float band = smoothstep(0.02, 0.22, lum);
-  float soft = smoothstep(0.0, 0.12, lum) * 0.28;
-  vec3 col = t * (band * uBoost + soft);
-  col *= vec3(0.9, 0.93, 1.08);
-  gl_FragColor = vec4(col, 1.0);
-}
-`;
 
 function MilkyWaySky() {
   const map = useLazyTexture(EXTRA_MAPS.milkyWay);
@@ -532,155 +385,6 @@ function ZodiacalDust() {
     </group>
   );
 }
-
-/* ------------------------------------------------------------------ */
-/*  Sun — 3D spherical photosphere (glow stays on the disc)            */
-/* ------------------------------------------------------------------ */
-
-const SUN_RADIUS = 5.5;
-
-const SUN_VERT = /* glsl */ `
-varying vec2 vUv;
-varying vec3 vObjN;   // object-space normal → seamless sphere noise
-varying vec3 vNormalV;
-varying vec3 vViewV;
-varying vec3 vNormalW;
-void main() {
-  vUv = uv;
-  vObjN = normalize(normal);
-  vNormalW = normalize(mat3(modelMatrix) * normal);
-  vec4 mv = modelViewMatrix * vec4(position, 1.0);
-  vNormalV = normalize(normalMatrix * normal);
-  vViewV = normalize(-mv.xyz);
-  gl_Position = projectionMatrix * mv;
-}
-`;
-
-const SUN_FRAG = /* glsl */ `
-uniform sampler2D uMap;
-uniform float uTime;
-uniform float uHasMap;
-varying vec2 vUv;
-varying vec3 vObjN;
-varying vec3 vNormalV;
-varying vec3 vViewV;
-varying vec3 vNormalW;
-
-// 3D hash / noise so granulation wraps the sphere (no UV seams / flat disc look)
-float hash3(vec3 p) {
-  p = fract(p * 0.3183099 + vec3(0.1, 0.2, 0.3));
-  p *= 17.0;
-  return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
-}
-float noise3(vec3 x) {
-  vec3 i = floor(x);
-  vec3 f = fract(x);
-  f = f * f * (3.0 - 2.0 * f);
-  return mix(
-    mix(mix(hash3(i), hash3(i + vec3(1,0,0)), f.x),
-        mix(hash3(i + vec3(0,1,0)), hash3(i + vec3(1,1,0)), f.x), f.y),
-    mix(mix(hash3(i + vec3(0,0,1)), hash3(i + vec3(1,0,1)), f.x),
-        mix(hash3(i + vec3(0,1,1)), hash3(i + vec3(1,1,1)), f.x), f.y),
-    f.z
-  );
-}
-float fbm3(vec3 p) {
-  float v = 0.0;
-  float a = 0.5;
-  for (int i = 0; i < 5; i++) {
-    v += a * noise3(p);
-    p = p * 2.11 + vec3(1.7, 9.2, 3.1);
-    a *= 0.5;
-  }
-  return v;
-}
-
-void main() {
-  vec3 nObj = normalize(vObjN);
-  float t = uTime;
-
-  // Slow spherical convection (domain warp on the unit sphere)
-  vec3 flow = vec3(
-    fbm3(nObj * 2.2 + vec3(t * 0.04, 0.0, t * 0.02)),
-    fbm3(nObj * 2.2 + vec3(2.1, t * 0.035, -1.4)),
-    fbm3(nObj * 2.2 + vec3(-t * 0.03, 1.7, 3.3))
-  );
-  vec3 p = nObj * 4.5 + (flow - 0.5) * 0.55;
-
-  float cells = fbm3(p);
-  float cells2 = fbm3(p * 2.4 + t * 0.05);
-  float gran = smoothstep(0.32, 0.7, cells * 0.62 + cells2 * 0.38);
-  float ridges = pow(1.0 - abs(cells - 0.48) * 2.1, 2.4);
-  float cracks = smoothstep(0.58, 0.92, fbm3(p * 3.5 + t * 0.08));
-  // Micro bump cue for 3D relief (lighting-like shading of granules)
-  float micro = fbm3(p * 8.0) * 0.12;
-
-  // SSS map as large-scale color (still spherical via UV)
-  vec3 texCol = vec3(1.0, 0.55, 0.18);
-  if (uHasMap > 0.5) {
-    texCol = texture2D(uMap, vUv).rgb;
-  }
-
-  // Photosphere palette — cooler at edges via limb, hot centers
-  vec3 cool = vec3(0.45, 0.1, 0.02);
-  vec3 mid  = vec3(0.95, 0.38, 0.06);
-  vec3 hot  = vec3(1.0, 0.72, 0.28);
-  vec3 core = vec3(1.0, 0.9, 0.65);
-
-  vec3 col = mix(cool, mid, gran);
-  col = mix(col, hot, ridges * 0.55);
-  col = mix(col, core, cracks * 0.4);
-  col = mix(col, texCol * vec3(1.2, 0.7, 0.28), 0.4 * uHasMap + 0.15);
-  col *= 0.92 + micro;
-
-  // Strong limb darkening → readable sphere (this is the main "3D" cue)
-  vec3 nV = normalize(vNormalV);
-  vec3 vV = normalize(vViewV);
-  float ndv = max(dot(nV, vV), 0.0);
-  // Classic solar limb darkening ~ mu^0.6–0.8 with deep rim falloff
-  float limb = pow(ndv, 0.72);
-  col *= 0.18 + 0.82 * limb;
-
-  // Hot spots only near disc center (limits Bloom to the face, not the silhouette)
-  float faceBoost = smoothstep(0.15, 0.85, ndv);
-  col += vec3(1.0, 0.75, 0.35) * cracks * ridges * 0.22 * faceBoost;
-
-  // Thin chromosphere at the geometric limb only (still on the sphere mesh)
-  float rim = pow(1.0 - ndv, 4.5);
-  col += vec3(1.0, 0.4, 0.08) * rim * 0.45;
-
-  // Hard cap so Bloom cannot spill a system-wide haze
-  // Peak ~1.05–1.15 on face → only center exceeds high bloom threshold
-  col = min(col * 1.05, vec3(1.15, 1.05, 0.85));
-
-  gl_FragColor = vec4(col, 1.0);
-}
-`;
-
-/** Tight chromosphere shell — geometric rim only, no billboard haze. */
-const CHROMA_VERT = /* glsl */ `
-varying vec3 vNormalV;
-varying vec3 vViewV;
-void main() {
-  vec4 mv = modelViewMatrix * vec4(position, 1.0);
-  vNormalV = normalize(normalMatrix * normal);
-  vViewV = normalize(-mv.xyz);
-  gl_Position = projectionMatrix * mv;
-}
-`;
-
-const CHROMA_FRAG = /* glsl */ `
-varying vec3 vNormalV;
-varying vec3 vViewV;
-void main() {
-  float ndv = max(dot(normalize(vNormalV), normalize(vViewV)), 0.0);
-  // Only a thin ring at the silhouette
-  float rim = pow(1.0 - ndv, 5.5);
-  if (rim < 0.04) discard;
-  vec3 col = vec3(1.0, 0.55, 0.15) * rim;
-  gl_FragColor = vec4(col, rim * 0.55);
-}
-`;
 
 /**
  * Natural solar glow + lens flare — scene-based (no EffectComposer).
@@ -1067,50 +771,6 @@ function Sun({
 }
 
 /* ------------------------------------------------------------------ */
-/*  Earth — day / night / clouds                                       */
-/* ------------------------------------------------------------------ */
-
-const EARTH_VERT = /* glsl */ `
-varying vec2 vUv;
-varying vec3 vNormalW;
-varying vec3 vPosW;
-void main() {
-  vUv = uv;
-  vec4 wp = modelMatrix * vec4(position, 1.0);
-  vPosW = wp.xyz;
-  vNormalW = normalize(mat3(modelMatrix) * normal);
-  gl_Position = projectionMatrix * viewMatrix * wp;
-}
-`;
-
-const EARTH_FRAG = /* glsl */ `
-uniform sampler2D dayMap;
-uniform sampler2D nightMap;
-uniform sampler2D specularMap;
-uniform vec3 sunPosition;
-varying vec2 vUv;
-varying vec3 vNormalW;
-varying vec3 vPosW;
-void main() {
-  vec3 dayCol = texture2D(dayMap, vUv).rgb;
-  vec3 nightCol = texture2D(nightMap, vUv).rgb * 1.35;
-  float ocean = texture2D(specularMap, vUv).r;
-  vec3 n = normalize(vNormalW);
-  vec3 l = normalize(sunPosition - vPosW);
-  float ndl = dot(n, l);
-  float dayF = smoothstep(-0.12, 0.28, ndl);
-  vec3 color = mix(nightCol, dayCol, dayF);
-  vec3 viewDir = normalize(cameraPosition - vPosW);
-  vec3 halfV = normalize(l + viewDir);
-  float spec = pow(max(dot(n, halfV), 0.0), 48.0) * ocean * dayF;
-  color += vec3(0.55, 0.7, 1.0) * spec * 0.55;
-  // limb atmosphere hint
-  float fres = pow(1.0 - max(dot(n, viewDir), 0.0), 2.5);
-  color += vec3(0.25, 0.5, 1.0) * fres * 0.18 * dayF;
-  gl_FragColor = vec4(color, 1.0);
-}
-`;
-
 function EarthMoon({
   earthSize,
   showOrbit = true,
@@ -1468,117 +1128,6 @@ function AsteroidBelt({
  * so line 0 is at the top of the billboard (flipY=false made labels
  * upside-down / hard to read).
  */
-function makeTextSpriteTexture(
-  lines: string[],
-  opts?: { fontSize?: number },
-): { map: THREE.CanvasTexture; aspect: number } {
-  const fontSize = opts?.fontSize ?? 22;
-  const padX = 10;
-  const padY = 8;
-  const canvas = document.createElement("canvas");
-  const ctx = canvas.getContext("2d")!;
-  const fonts = lines.map((_, i) =>
-    i === 0
-      ? `700 ${fontSize}px ui-sans-serif, system-ui, sans-serif`
-      : `600 ${Math.round(fontSize * 0.78)}px ui-sans-serif, system-ui, sans-serif`,
-  );
-  let maxW = 0;
-  lines.forEach((line, i) => {
-    ctx.font = fonts[i];
-    maxW = Math.max(maxW, ctx.measureText(line).width);
-  });
-  const lineH = fontSize * 1.25;
-  const w = Math.ceil(maxW + padX * 2 + 8);
-  const h = Math.ceil(lines.length * lineH + padY * 2 + 4);
-  // Power-of-two friendly size helps filtering; not required but sharper
-  canvas.width = Math.max(16, w);
-  canvas.height = Math.max(16, h);
-  // Re-apply fonts after resize (canvas clear resets state)
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.textBaseline = "middle";
-  ctx.textAlign = "center";
-  // Soft dark halo for readability without a hard rectangle
-  lines.forEach((line, i) => {
-    const y = padY + lineH * (i + 0.5);
-    ctx.font = fonts[i];
-    ctx.lineJoin = "round";
-    ctx.miterLimit = 2;
-    ctx.lineWidth = 5;
-    ctx.strokeStyle = "rgba(0, 0, 0, 0.9)";
-    ctx.strokeText(line, canvas.width / 2, y);
-    ctx.fillStyle =
-      i === 0 ? "rgba(245, 250, 255, 0.98)" : "rgba(200, 218, 232, 0.92)";
-    ctx.fillText(line, canvas.width / 2, y);
-  });
-  const map = new THREE.CanvasTexture(canvas);
-  map.colorSpace = THREE.SRGBColorSpace;
-  // Premultiply off + flipY true = upright, readable sprites in r152+
-  map.premultiplyAlpha = false;
-  map.flipY = true;
-  map.generateMipmaps = false;
-  map.minFilter = THREE.LinearFilter;
-  map.magFilter = THREE.LinearFilter;
-  map.needsUpdate = true;
-  return { map, aspect: canvas.width / Math.max(canvas.height, 1) };
-}
-
-function labelWorldHeight(dist: number, kind: "name" | "detail"): number {
-  const base = kind === "detail" ? 1.15 : 0.95;
-  return THREE.MathUtils.clamp(
-    dist * 0.012 * base,
-    0.75,
-    kind === "detail" ? 2.1 : 1.7,
-  );
-}
-
-/** Screen-space test: is world point on/near the sun disc from the camera? */
-function isNearSunDisc(
-  world: THREE.Vector3,
-  camera: THREE.Camera,
-  tmpA: THREE.Vector3,
-  tmpB: THREE.Vector3,
-  labelRadius = 0,
-): boolean {
-  if (!(camera instanceof THREE.PerspectiveCamera)) {
-    // Fallback to crude angular test for non-perspective cameras.
-    tmpA.copy(world).sub(camera.position);
-    const dist = tmpA.length();
-    if (dist < 1e-4) return true;
-    tmpA.normalize();
-    tmpB.copy(camera.position).multiplyScalar(-1).normalize(); // toward origin
-    const cos = tmpA.dot(tmpB);
-
-    const sunDist = camera.position.length();
-    if (sunDist <= SUN_RADIUS) return true;
-    const sunAngle = Math.asin(Math.min(1, SUN_RADIUS / sunDist));
-    const bufferAngle = 0.05;
-    return cos > Math.cos(sunAngle + bufferAngle + labelRadius);
-  }
-
-  const screenSun = tmpA.set(0, 0, 0).project(camera);
-  const cameraRight = tmpB.set(1, 0, 0).applyQuaternion(camera.quaternion);
-  const sunWorldEdge = new THREE.Vector3()
-    .copy(cameraRight)
-    .multiplyScalar(SUN_RADIUS);
-  const screenSunEdge = sunWorldEdge.project(camera);
-  const sunRadius = Math.abs(screenSunEdge.x - screenSun.x);
-
-  const labelScreen = new THREE.Vector3().copy(world).project(camera);
-  const labelDist = camera.position.distanceTo(world);
-  const labelWorldRadius = labelDist * Math.tan(labelRadius);
-  const labelWorldEdge = new THREE.Vector3()
-    .copy(world)
-    .addScaledVector(cameraRight, labelWorldRadius);
-  const labelScreenEdge = labelWorldEdge.project(camera);
-  const labelRadiusScreen = Math.abs(labelScreenEdge.x - labelScreen.x);
-
-  const dist = Math.hypot(
-    labelScreen.x - screenSun.x,
-    labelScreen.y - screenSun.y,
-  );
-  return dist < sunRadius + labelRadiusScreen + 0.03;
-}
-
 function DistanceLabel({
   itemId,
   name,
@@ -1765,55 +1314,6 @@ function SelectionLabel({
     </sprite>
   );
 }
-
-/* ------------------------------------------------------------------ */
-/*  Generic planet                                                     */
-/* ------------------------------------------------------------------ */
-
-const JUPITER_VERT = /* glsl */ `
-varying vec2 vUv;
-varying vec3 vNormalW;
-varying vec3 vPosW;
-void main() {
-  vUv = uv;
-  vec4 wp = modelMatrix * vec4(position, 1.0);
-  vPosW = wp.xyz;
-  vNormalW = normalize(mat3(modelMatrix) * normal);
-  gl_Position = projectionMatrix * viewMatrix * wp;
-}
-`;
-
-const JUPITER_FRAG = /* glsl */ `
-uniform sampler2D map;
-uniform float uTime;
-varying vec2 vUv;
-varying vec3 vNormalW;
-varying vec3 vPosW;
-// simple band turbulence
-float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453); }
-float noise(vec2 p){
-  vec2 i = floor(p); vec2 f = fract(p);
-  float a = hash(i); float b = hash(i+vec2(1.,0.));
-  float c = hash(i+vec2(0.,1.)); float d = hash(i+vec2(1.,1.));
-  vec2 u = f*f*(3.-2.*f);
-  return mix(a,b,u.x)+ (c-a)*u.y*(1.-u.x)+ (d-b)*u.x*u.y;
-}
-void main() {
-  vec2 uv = vUv;
-  float bands = sin(uv.y * 48.0 + noise(uv * vec2(6.0, 20.0) + uTime * 0.05) * 1.5);
-  vec3 base = texture2D(map, uv).rgb;
-  base *= 0.92 + bands * 0.08;
-  // great-red-spot-ish warm blotch
-  vec2 spot = uv - vec2(0.62, 0.42);
-  spot.x *= 1.8;
-  float s = exp(-dot(spot, spot) * 90.0);
-  base = mix(base, base * vec3(1.15, 0.75, 0.55), s * 0.45);
-  vec3 n = normalize(vNormalW);
-  vec3 l = normalize(-vPosW);
-  float ndl = clamp(dot(n, l) * 0.55 + 0.45, 0.2, 1.0);
-  gl_FragColor = vec4(base * ndl, 1.0);
-}
-`;
 
 /**
  * SSS ring strip is 2048×125 (radial features along width).
