@@ -4,6 +4,7 @@ import React, {
   useCallback,
   useEffect,
   useRef,
+  useReducer,
   Suspense,
 } from "react";
 import { Canvas } from "@react-three/fiber";
@@ -32,6 +33,10 @@ import type { SbdbOrbitResult, SentryWatchItem } from "@shared";
 import { designationForSbdb } from "@shared";
 import axios from "axios";
 import { getApiBaseUrl } from "../lib/apiBase";
+import {
+  initialLiveMissionState,
+  liveMissionReducer,
+} from "../mission/liveMissionState";
 import { toThreePath } from "../lib/vec3";
 import {
   asteroidFromSentrySbdb,
@@ -51,13 +56,11 @@ import { FrameloopController, SimTicker } from "../sim/SimContext";
 import { useSimActions, useSimSettings } from "../sim/useSim";
 import { SceneBackdrop } from "../components/ThreeDScene";
 import { qualitySettings, scalePosition } from "../sim/simUtils";
-import { todayIsoLocal } from "../lib/dateUtils";
 import { closestAsteroid, sortAsteroidsByMiss } from "../lib/neoSort";
 import {
   COMPARE_COLORS,
   copyShareUrl,
   parseOrbitUrl,
-  toggleCompareId,
   writeOrbitUrl,
   type OrbitUrlState,
 } from "../lib/urlState";
@@ -104,47 +107,38 @@ const MissionControl = React.memo(function MissionControl() {
     return readStepFromHash() === "live" ? "live" : "story";
   });
   const [selectedItem, setSelectedItem] = useState<CelestialItem | null>(null);
-  const [approachDate, setApproachDate] = useState(
-    () => initialUrl.date ?? todayIsoLocal(),
+  const [live, dispatchLive] = useReducer(
+    liveMissionReducer,
+    initialUrl,
+    initialLiveMissionState,
   );
-  const [showHazardous, setShowHazardous] = useState(
-    () => initialUrl.hazardous ?? false,
-  );
-  const [searchTerm, setSearchTerm] = useState("");
-  const [page, setPage] = useState(1);
-  const [showPlanets, setShowPlanets] = useState(true);
-  /** P4 — up to 2 NEO ids for dual orbit compare */
-  const [compareIds, setCompareIds] = useState<string[]>(
-    () => initialUrl.compare ?? [],
-  );
+  const {
+    approachDate,
+    page,
+    searchTerm,
+    showHazardous,
+    showPlanets,
+    compareIds,
+    showIss,
+    issFocus,
+    showSentry,
+    sentryBriefDes,
+    maxMissLd,
+    minDiameterM,
+    rulerEnabled,
+    rulerA,
+    rulerB,
+    rulerSceneDist,
+  } = live;
+
   const [copyLinkStatus, setCopyLinkStatus] = useState<
     "idle" | "copied" | "failed"
   >("idle");
-  /** P5 live layers */
-  const [showIss, setShowIss] = useState(
-    () => Boolean(initialUrl.issFocus) || false,
-  );
-  const [issFocus, setIssFocus] = useState(() => initialUrl.issFocus ?? false);
-  const [showSentry, setShowSentry] = useState(
-    () => Boolean(initialUrl.sentry) || false,
-  );
-  /** Sentry object not on NeoWs page — soft briefing (no browser alert) */
-  const [sentryBriefDes, setSentryBriefDes] = useState<string | null>(
-    () => initialUrl.sentry ?? null,
-  );
   const [sentryBriefSummary, setSentryBriefSummary] =
     useState<SentryWatchItem | null>(null);
   const [sbdbHint, setSbdbHint] = useState<string | null>(null);
   /** Synthetic body from Sentry+SBDB drawn in the scene */
   const [sentrySceneBody, setSentrySceneBody] = useState<Asteroid | null>(null);
-
-  /** P6 filters + ruler + export */
-  const [maxMissLd, setMaxMissLd] = useState<number | null>(null);
-  const [minDiameterM, setMinDiameterM] = useState<number | null>(null);
-  const [rulerEnabled, setRulerEnabled] = useState(false);
-  const [rulerA, setRulerA] = useState<RulerEndpoint | null>(null);
-  const [rulerB, setRulerB] = useState<RulerEndpoint | null>(null);
-  const [rulerSceneDist, setRulerSceneDist] = useState<number | null>(null);
   const [exportStatus, setExportStatus] = useState<
     "idle" | "copied" | "failed"
   >("idle");
@@ -169,13 +163,11 @@ const MissionControl = React.memo(function MissionControl() {
       setViewScale(initialUrl.view ?? "nearEarth");
       setCameraMode("tour");
       if (initialUrl.issFocus) {
-        setShowIss(true);
-        setIssFocus(true);
+        dispatchLive({ type: "SET_ISS", show: true, focus: true });
         setViewScale("nearEarth");
       }
       if (initialUrl.sentry) {
-        setShowSentry(true);
-        setSentryBriefDes(initialUrl.sentry);
+        dispatchLive({ type: "SET_SENTRY", show: true, briefDes: initialUrl.sentry });
       }
     } else if (initialUrl.view) {
       setViewScale(initialUrl.view);
@@ -205,7 +197,7 @@ const MissionControl = React.memo(function MissionControl() {
         setCameraMode("tour");
       } else {
         setSelectedItem((cur) => (cur && isAsteroid(cur) ? null : cur));
-        setCompareIds([]);
+        dispatchLive({ type: "CLEAR_COMPARE" });
         setViewScale("system");
         setCameraMode("tour");
         if (step === "live") goToStep("briefing");
@@ -229,10 +221,10 @@ const MissionControl = React.memo(function MissionControl() {
     const onPop = () => {
       const p = parseOrbitUrl();
       if (p.mode === "live" || p.mode === "story") setMode(p.mode);
-      if (p.date) setApproachDate(p.date);
+      if (p.date) dispatchLive({ type: "SET_DATE", date: p.date });
       if (p.view) setViewScale(p.view);
-      if (p.hazardous != null) setShowHazardous(p.hazardous);
-      if (p.compare) setCompareIds(p.compare);
+      if (p.hazardous != null) dispatchLive({ type: "SET_HAZARDOUS", value: p.hazardous });
+      if (p.compare) dispatchLive({ type: "SET_COMPARE", ids: p.compare });
       if (p.neo) pendingNeo.current = p.neo;
       else setSelectedItem((cur) => (cur && isAsteroid(cur) ? null : cur));
     };
@@ -280,7 +272,7 @@ const MissionControl = React.memo(function MissionControl() {
   useEffect(() => {
     if (!asteroidsData?.pagination) return;
     const serverPage = asteroidsData.pagination.currentPage;
-    setPage((p) => (serverPage !== p ? serverPage : p));
+    dispatchLive({ type: "SET_PAGE", page: serverPage });
   }, [asteroidsData]);
 
   const filteredAsteroids = useMemo(() => {
@@ -324,7 +316,7 @@ const MissionControl = React.memo(function MissionControl() {
         .map((id) => findAsteroidByRef(list, id)?.id)
         .filter((id): id is string => Boolean(id))
         .slice(0, 2);
-      if (resolved.length) setCompareIds(resolved);
+      if (resolved.length) dispatchLive({ type: "SET_COMPARE", ids: resolved });
       pendingCompare.current = [];
     }
   }, [asteroidsData, setCameraMode]);
@@ -527,14 +519,14 @@ const MissionControl = React.memo(function MissionControl() {
           name: item.name,
         };
         if (!rulerA || (rulerA && rulerB)) {
-          setRulerA(ep);
-          setRulerB(null);
-          setRulerSceneDist(null);
+          dispatchLive({ type: "SET_RULER_A", value: ep });
+          dispatchLive({ type: "SET_RULER_B", value: null });
+          dispatchLive({ type: "SET_RULER_DIST", value: null });
         } else if (
           rulerA.kind === "sun" ||
           (rulerA.kind === "body" && rulerA.id !== item.id)
         ) {
-          setRulerB(ep);
+          dispatchLive({ type: "SET_RULER_B", value: ep });
         }
         // Still select for inspector context
       }
@@ -542,13 +534,13 @@ const MissionControl = React.memo(function MissionControl() {
       // Switching to a normal body clears any Sentry-only inject
       if (isAsteroid(item) && !isSentrySceneId(item.id)) {
         setSentrySceneBody(null);
-        setSentryBriefDes(null);
+        dispatchLive({ type: "SET_SENTRY_BRIEF", des: null });
         setSentryBriefSummary(null);
         setSbdbHint(null);
       }
       setSelectedItem(item);
       if (!rulerEnabled) setCameraMode("focus");
-      setIssFocus(false);
+      dispatchLive({ type: "SET_ISS_FOCUS", value: false });
       window.dispatchEvent(new Event("orbit-sfx-click"));
       if (mode !== "live") {
         setMode("live");
@@ -559,38 +551,38 @@ const MissionControl = React.memo(function MissionControl() {
   );
 
   const handleSelectDate = useCallback((iso: string) => {
-    setApproachDate(iso);
-    setPage(1);
+    dispatchLive({ type: "SET_DATE", date: iso });
+    dispatchLive({ type: "SET_PAGE", page: 1 });
     setSelectedItem((cur) => (cur && isAsteroid(cur) ? null : cur));
   }, []);
 
   const handleHazardousChange = useCallback((value: boolean) => {
-    setShowHazardous(value);
-    setPage(1);
-    setSearchTerm("");
+    dispatchLive({ type: "SET_HAZARDOUS", value: value });
+    dispatchLive({ type: "SET_PAGE", page: 1 });
+    dispatchLive({ type: "SET_SEARCH", value: "" });
     setSelectedItem((cur) => (cur && isAsteroid(cur) ? null : cur));
   }, []);
 
   const handlePageChange = useCallback((next: number) => {
-    setPage(Math.max(1, next));
+    dispatchLive({ type: "SET_PAGE", page: Math.max(1, next) });
     setSelectedItem((cur) => (cur && isAsteroid(cur) ? null : cur));
   }, []);
 
   const handleSearchChange = useCallback((value: string) => {
-    setSearchTerm(value);
+    dispatchLive({ type: "SET_SEARCH", value });
   }, []);
 
   const handleToggleCompare = useCallback(() => {
     if (!displaySelected || !isAsteroid(displaySelected)) return;
-    setCompareIds((prev) => toggleCompareId(prev, displaySelected.id));
+    dispatchLive({ type: "TOGGLE_COMPARE", id: displaySelected.id });
   }, [displaySelected]);
 
   const handleClearCompare = useCallback(() => {
-    setCompareIds([]);
+    dispatchLive({ type: "CLEAR_COMPARE" });
   }, []);
 
   const handleRemoveCompare = useCallback((id: string) => {
-    setCompareIds((prev) => prev.filter((x) => x !== id));
+    dispatchLive({ type: "REMOVE_COMPARE", id });
   }, []);
 
   const apiBase = useMemo(() => getApiBaseUrl(), []);
@@ -621,7 +613,7 @@ const MissionControl = React.memo(function MissionControl() {
         setSentrySceneBody(body);
         setSelectedItem(body);
         setCameraMode("focus");
-        setIssFocus(false);
+        dispatchLive({ type: "SET_ISS_FOCUS", value: false });
         setViewScale("system"); // SBDB orbits are heliocentric — System view is honest
         setSbdbHint(
           `Drawn in scene · SBDB a=${data.aAu?.toFixed(3)} au · e=${data.e?.toFixed(3)} · System view recommended`,
@@ -645,12 +637,12 @@ const MissionControl = React.memo(function MissionControl() {
         findAsteroidByRef(pool, des) ||
         findAsteroidByRef(pool, sentrySceneId(des));
       if (found) {
-        setSentryBriefDes(null);
+        dispatchLive({ type: "SET_SENTRY_BRIEF", des: null });
         setSentryBriefSummary(null);
         setSbdbHint(null);
         setSelectedItem(found);
         setCameraMode("focus");
-        setIssFocus(false);
+        dispatchLive({ type: "SET_ISS_FOCUS", value: false });
         return;
       }
       // Soft briefing + auto-promote to scene via SBDB (production path)
@@ -661,7 +653,7 @@ const MissionControl = React.memo(function MissionControl() {
             it.fullname.toLowerCase().includes(des.toLowerCase()),
         ) ?? null;
       setSentryBriefSummary(summary);
-      setSentryBriefDes(des);
+      dispatchLive({ type: "SET_SENTRY_BRIEF", des: des });
       setSbdbHint(null);
       void promoteSentryToScene(des, summary);
     },
@@ -679,13 +671,13 @@ const MissionControl = React.memo(function MissionControl() {
     if (!pendingSentry.current || mode !== "live") return;
     const des = pendingSentry.current;
     pendingSentry.current = null;
-    setShowSentry(true);
+    dispatchLive({ type: "SET_SENTRY", show: true });
     handleSentryPickDes(des);
   }, [mode, handleSentryPickDes]);
 
   /** Full reset when leaving Sentry briefing / unselecting a Sentry-only body */
   const resetSentryState = useCallback(() => {
-    setSentryBriefDes(null);
+    dispatchLive({ type: "SET_SENTRY_BRIEF", des: null });
     setSentryBriefSummary(null);
     setSbdbHint(null);
     setSentrySceneBody(null);
@@ -703,7 +695,7 @@ const MissionControl = React.memo(function MissionControl() {
     setSelectedItem((cur) => {
       if (cur && isAsteroid(cur) && isSentrySceneId(cur.id)) {
         // Clearing a Sentry-only selection = full reset
-        setSentryBriefDes(null);
+        dispatchLive({ type: "SET_SENTRY_BRIEF", des: null });
         setSentryBriefSummary(null);
         setSbdbHint(null);
         setSentrySceneBody(null);
@@ -720,8 +712,8 @@ const MissionControl = React.memo(function MissionControl() {
 
   const handleShowIssChange = useCallback(
     (v: boolean) => {
-      setShowIss(v);
-      if (!v) setIssFocus(false);
+      dispatchLive({ type: "SET_ISS", show: v });
+      if (!v) dispatchLive({ type: "SET_ISS_FOCUS", value: false });
       else {
         setViewScale("nearEarth");
       }
@@ -731,14 +723,14 @@ const MissionControl = React.memo(function MissionControl() {
 
   const handleIssFocusChange = useCallback(
     (v: boolean) => {
-      setIssFocus(v);
+      dispatchLive({ type: "SET_ISS_FOCUS", value: v });
       if (v) {
-        setShowIss(true);
+        dispatchLive({ type: "SET_ISS", show: true });
         setViewScale("nearEarth");
         setCameraMode("tour");
         // Leaving Sentry selection when entering ISS focus
         setSelectedItem(null);
-        setSentryBriefDes(null);
+        dispatchLive({ type: "SET_SENTRY_BRIEF", des: null });
         setSentryBriefSummary(null);
         setSbdbHint(null);
         setSentrySceneBody(null);
@@ -749,10 +741,10 @@ const MissionControl = React.memo(function MissionControl() {
 
   const handleShowSentryChange = useCallback(
     (v: boolean) => {
-      setShowSentry(v);
+      dispatchLive({ type: "SET_SENTRY", show: v });
       if (!v) {
         // Closing Sentry panel = full reset of Sentry inject
-        setSentryBriefDes(null);
+        dispatchLive({ type: "SET_SENTRY_BRIEF", des: null });
         setSentryBriefSummary(null);
         setSbdbHint(null);
         setSentrySceneBody(null);
@@ -793,7 +785,7 @@ const MissionControl = React.memo(function MissionControl() {
 
   const handleGuidedTour = useCallback(
     (id: GuidedTourId) => {
-      setIssFocus(false);
+      dispatchLive({ type: "SET_ISS_FOCUS", value: false });
       if (id === "closest") {
         setMode("live");
         goToStep("live");
@@ -809,7 +801,7 @@ const MissionControl = React.memo(function MissionControl() {
         setMode("live");
         goToStep("live");
         setViewScale("nearEarth");
-        setShowIss(false);
+        dispatchLive({ type: "SET_ISS", show: false });
         setCameraMode("tour");
         const earth = planetsData?.data?.find((p) => p.name === "Earth");
         if (earth) setSelectedItem(earth);
@@ -825,7 +817,7 @@ const MissionControl = React.memo(function MissionControl() {
         setMode("live");
         goToStep("live");
         setViewScale("system");
-        setIssFocus(false);
+        dispatchLive({ type: "SET_ISS_FOCUS", value: false });
         setCameraMode("tour");
         setSelectedItem(null);
         return;
@@ -850,24 +842,24 @@ const MissionControl = React.memo(function MissionControl() {
 
   const handleRulerVsEarth = useCallback(() => {
     if (!displaySelected || !isAsteroid(displaySelected)) return;
-    setRulerEnabled(true);
-    setRulerA({
+    dispatchLive({ type: "SET_RULER_ENABLED", value: true });
+    dispatchLive({ type: "SET_RULER_A", value: {
       kind: "body",
       id: displaySelected.id,
       name: displaySelected.name,
-    });
-    setRulerB({ kind: "body", id: "planet:Earth", name: "Earth" });
+    } });
+    dispatchLive({ type: "SET_RULER_B", value: { kind: "body", id: "planet:Earth", name: "Earth" } });
   }, [displaySelected]);
 
   const handleRulerVsSun = useCallback(() => {
     if (!displaySelected) return;
-    setRulerEnabled(true);
-    setRulerA({
+    dispatchLive({ type: "SET_RULER_ENABLED", value: true });
+    dispatchLive({ type: "SET_RULER_A", value: {
       kind: "body",
       id: displaySelected.id,
       name: displaySelected.name,
-    });
-    setRulerB({ kind: "sun", name: "Sun" });
+    } });
+    dispatchLive({ type: "SET_RULER_B", value: { kind: "sun", name: "Sun" } });
   }, [displaySelected]);
 
   const handleCopyLink = useCallback(async () => {
@@ -951,7 +943,7 @@ const MissionControl = React.memo(function MissionControl() {
                     : rulerB.id
                   : null
               }
-              onMeasureDistance={setRulerSceneDist}
+              onMeasureDistance={(d) => dispatchLive({ type: "SET_RULER_DIST", value: d })}
             />
           </Suspense>
         </Canvas>
@@ -1005,7 +997,7 @@ const MissionControl = React.memo(function MissionControl() {
               showHazardous={showHazardous}
               onHazardousChange={handleHazardousChange}
               showPlanets={showPlanets}
-              onPlanetsChange={setShowPlanets}
+              onPlanetsChange={(v) => dispatchLive({ type: "SET_SHOW_PLANETS", value: v })}
               selectedItem={displaySelected}
               onClearSelection={handleClearSelection}
               onSelectItem={handleItemClick}
@@ -1047,19 +1039,19 @@ const MissionControl = React.memo(function MissionControl() {
               onExportSummary={handleExportSummary}
               exportStatus={exportStatus}
               maxMissLd={maxMissLd}
-              onMaxMissLdChange={setMaxMissLd}
+              onMaxMissLdChange={(v) => dispatchLive({ type: "SET_MAX_MISS_LD", value: v })}
               minDiameterM={minDiameterM}
-              onMinDiameterMChange={setMinDiameterM}
+              onMinDiameterMChange={(v) => dispatchLive({ type: "SET_MIN_DIAMETER_M", value: v })}
               rulerEnabled={rulerEnabled}
-              onRulerEnabledChange={setRulerEnabled}
+              onRulerEnabledChange={(v) => dispatchLive({ type: "SET_RULER_ENABLED", value: v })}
               rulerA={rulerA}
               rulerB={rulerB}
               rulerSceneDist={rulerSceneDist}
               rulerApproachMiss={rulerApproachMiss}
               onRulerClear={() => {
-                setRulerA(null);
-                setRulerB(null);
-                setRulerSceneDist(null);
+                dispatchLive({ type: "SET_RULER_A", value: null });
+                dispatchLive({ type: "SET_RULER_B", value: null });
+                dispatchLive({ type: "SET_RULER_DIST", value: null });
               }}
               onRulerVsEarth={handleRulerVsEarth}
               onRulerVsSun={handleRulerVsSun}
