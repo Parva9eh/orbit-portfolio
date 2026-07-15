@@ -15,7 +15,7 @@ import {
 import {
   getRawAsteroidCatalog,
   paginateAsteroids,
-} from "../lib/astroServices.ts";
+} from "../lib/neoCatalog.ts";
 
 const router = Router();
 

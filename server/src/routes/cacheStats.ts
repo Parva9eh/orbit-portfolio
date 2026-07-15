@@ -11,7 +11,7 @@ import {
   inflightIss,
   inflightSentry,
 } from "../lib/cache.ts";
-import { mockAsteroidsMem } from "../lib/astroServices.ts";
+import { mockAsteroidsMem } from "../lib/neoCatalog.ts";
 
 const router = Router();
 

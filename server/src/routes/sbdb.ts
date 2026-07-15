@@ -2,7 +2,7 @@ import { Router, type Request, type Response } from "express";
 import type { SbdbOrbitResult } from "../../../shared/index.ts";
 import { cache, SBDB_TTL_SEC, setJsonCache } from "../lib/cache.ts";
 import { parseDesignation } from "../lib/parseQuery.ts";
-import { fetchSbdb } from "../lib/astroServices.ts";
+import { fetchSbdb } from "../lib/sbdb.ts";
 
 const router = Router();
 
