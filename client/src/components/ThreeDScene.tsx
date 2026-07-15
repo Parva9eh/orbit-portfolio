@@ -34,21 +34,10 @@ import { OrbitProgressMarker, MotionTrail } from "./scene/MotionTrail";
 import AsteroidBelt from "./scene/AsteroidBelt";
 import { DistanceLabel, SelectionLabel } from "./scene/Labels";
 import NeoInstances from "./scene/NeoInstances";
+import { SceneBackdrop } from "./scene/SceneBackdrop";
+export { SceneBackdrop };
 import type { CompareOrbitSpec } from "./scene/types";
 
-/** Immediate dark clear — runs outside Suspense so first paint is never light-blue. */
-export function SceneBackdrop() {
-  const { gl } = useThree();
-  useEffect(() => {
-    gl.setClearColor(new THREE.Color("#010308"), 1);
-  }, [gl]);
-  return (
-    <>
-      <color attach="background" args={["#010308"]} />
-      <fog attach="fog" args={["#010308", 220, 620]} />
-    </>
-  );
-}
 
 /* ------------------------------------------------------------------ */
 /*  Main                                                               */

@@ -2,7 +2,7 @@ import { Router, type Request, type Response } from "express";
 import type { PaginatedResponse, Planet } from "../../../shared/index.ts";
 import { setJsonCache } from "../lib/cache.ts";
 import { parseLimit, parsePositiveInt } from "../lib/parseQuery.ts";
-import { ALL_PLANETS, EPHEMERIS_META } from "../lib/astroServices.ts";
+import { ALL_PLANETS, EPHEMERIS_META } from "../lib/planets.ts";
 
 const router = Router();
 
