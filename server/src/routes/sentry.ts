@@ -3,12 +3,12 @@ import { SENTRY_EDU_NOTE, type SentryDetail, type SentryWatchlist } from "../../
 import { cache, SENTRY_TTL_SEC, setJsonCache } from "../lib/cache.ts";
 import { parseDesignation, parsePositiveInt } from "../lib/parseQuery.ts";
 import {
-  axiosGetJson,
   detailFromWatchItem,
   fetchSentryWatchlist,
   findWatchItemByDes,
   sentryFallback,
-} from "../lib/astroServices.ts";
+} from "../lib/sentry.ts";
+import { axiosGetJson } from "../lib/http.ts";
 import { SENTRY_TIMEOUT_MS } from "../lib/cache.ts";
 
 const router = Router();
