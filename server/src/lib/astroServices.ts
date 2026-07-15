@@ -1,9 +1,7 @@
-import { Router, type Request, type Response } from "express";
-import axios from "axios";
-import NodeCache from "node-cache";
 import path from "node:path";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
+import axios from "axios";
 import {
   asAsteroid,
   asPlanet,
@@ -25,42 +23,27 @@ import {
   type SentryWatchlist,
   type Vec3,
 } from "../../../shared/index.ts";
-
-const router = Router();
-
-/** Full NASA / mock catalogs — 1h. Page envelopes are short-lived or sliced on demand. */
-const FULL_TTL_SEC = 3600;
-const PAGE_TTL_SEC = 300;
-const SBDB_TTL_SEC = 86_400; // 24h — orbital elements change rarely
-const SENTRY_TTL_SEC = 6 * 3600; // 6h — risk list changes slowly
-const ISS_TTL_SEC = 8; // short — live craft
-const NASA_TIMEOUT_MS = 12_000;
-const SBDB_TIMEOUT_MS = 10_000;
-const ISS_TIMEOUT_MS = 6_000;
-const SENTRY_TIMEOUT_MS = 18_000;
-const MAX_PAGE_LIMIT = 50;
-
-/**
- * useClones: false — we treat entries as immutable (no in-place mutation after set).
- * Avoids expensive deep clones on every get/set for NEO arrays.
- */
-const cache = new NodeCache({
-  stdTTL: FULL_TTL_SEC,
-  checkperiod: 120,
-  maxKeys: 500,
-  useClones: false,
-});
-
-/** Coalesce concurrent cold misses for the same catalog key (prevents NASA stampede). */
-const inflightCatalog = new Map<string, Promise<Asteroid[]>>();
-const inflightSbdb = new Map<string, Promise<SbdbOrbitResult>>();
+import {
+  cache,
+  FULL_TTL_SEC,
+  SBDB_TTL_SEC,
+  SENTRY_TTL_SEC,
+  ISS_TTL_SEC,
+  NASA_TIMEOUT_MS,
+  SBDB_TIMEOUT_MS,
+  ISS_TIMEOUT_MS,
+  SENTRY_TIMEOUT_MS,
+  inflightCatalog,
+  inflightSbdb,
+  inflightIss,
+  inflightSentry,
+} from "./cache.ts";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const jsonPath = path.join(__dirname, "data", "astro-data.json");
 
 const DEG = Math.PI / 180;
-const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 type LegacyAsteroid = {
   name: string;
@@ -109,7 +92,7 @@ type PlanetSeed = {
   hasRings?: boolean;
 };
 
-const PLANET_SEEDS: PlanetSeed[] = [
+export const PLANET_SEEDS: PlanetSeed[] = [
   {
     name: "Mercury",
     au: 0.387,
@@ -209,7 +192,7 @@ const PLANET_SEEDS: PlanetSeed[] = [
   },
 ];
 
-function buildPlanet(seed: PlanetSeed): Planet {
+export function buildPlanet(seed: PlanetSeed): Planet {
   const semiMajorAxis = auToSceneRadius(seed.au);
   const orbit: OrbitElements = {
     semiMajorAxis,
@@ -233,7 +216,7 @@ function buildPlanet(seed: PlanetSeed): Planet {
   });
 }
 
-function orbitFromScatteredPosition(
+export function orbitFromScatteredPosition(
   _position: Vec3,
   name: string
 ): OrbitElements {
@@ -252,10 +235,10 @@ function orbitFromScatteredPosition(
 }
 
 /** Mock file is static — load once for process lifetime (not re-read per request). */
-let mockAsteroidsMem: Asteroid[] | null = null;
+export let mockAsteroidsMem: Asteroid[] | null = null;
 let mockAsteroidsLoading: Promise<Asteroid[]> | null = null;
 
-function fallbackMockAsteroids(): Asteroid[] {
+export function fallbackMockAsteroids(): Asteroid[] {
   return [
     asAsteroid({
       name: "(2025 OA3)",
@@ -304,7 +287,7 @@ function fallbackMockAsteroids(): Asteroid[] {
   ];
 }
 
-async function loadMockAsteroids(): Promise<Asteroid[]> {
+export async function loadMockAsteroids(): Promise<Asteroid[]> {
   if (mockAsteroidsMem) return mockAsteroidsMem;
   if (mockAsteroidsLoading) return mockAsteroidsLoading;
 
@@ -351,9 +334,9 @@ async function loadMockAsteroids(): Promise<Asteroid[]> {
 }
 
 /** Planets never change — build once at module load. */
-const ALL_PLANETS: Planet[] = PLANET_SEEDS.map(buildPlanet);
+export const ALL_PLANETS: Planet[] = PLANET_SEEDS.map(buildPlanet);
 
-const EPHEMERIS_META = {
+export const EPHEMERIS_META = {
   source: "mean-elements",
   frame: "ecliptic-of-date (approx J2000-style)",
   note: "Planet orbits use semi-major axis, eccentricity, inclination, and mean period. Positions are for visualization, not navigation-grade ephemerides.",
@@ -380,7 +363,7 @@ const EPHEMERIS_META = {
  * Also maps NeoWs close-approach + diameter fields for Body Inspector (P1).
  * Scene orbits remain approx until SBDB (P3).
  */
-function processNeoData(neos: NasaNeo[][]): Asteroid[] {
+export function processNeoData(neos: NasaNeo[][]): Asteroid[] {
   const earthA = auToSceneRadius(1.0); // ~14 scene units
   return neos.flat().map((neo) => {
     const cad = neo.close_approach_data?.[0];
@@ -451,56 +434,12 @@ function processNeoData(neos: NasaNeo[][]): Asteroid[] {
   });
 }
 
-function parsePositiveInt(value: unknown, fallback: number): number {
-  const n = typeof value === "string" ? parseInt(value, 10) : Number(value);
-  return Number.isFinite(n) && n > 0 ? Math.floor(n) : fallback;
-}
-
-function parseLimit(value: unknown, fallback: number, max = MAX_PAGE_LIMIT): number {
-  return Math.min(max, parsePositiveInt(value, fallback));
-}
-
-function queryFlag(value: unknown): boolean {
-  return value === "true" || value === "1" || value === true;
-}
-
-/** YYYY-MM-DD or today — avoids bad NASA feed URLs. */
-function parseDateParam(value: unknown): string {
-  const s = String(value ?? "").trim();
-  if (ISO_DATE_RE.test(s)) {
-    const t = Date.parse(s + "T00:00:00Z");
-    if (Number.isFinite(t)) return s;
-  }
-  return new Date().toISOString().slice(0, 10);
-}
-
-/**
- * Designation / SBDB search string — allow only characters NASA/CNEOS accept.
- * Blocks path traversal, URL injection, and oversized junk even after encodeURIComponent.
- */
-const SAFE_DES_RE = /^[A-Za-z0-9][A-Za-z0-9\s.\-_()+/]{0,79}$/;
-
-function parseDesignation(value: unknown, maxLen = 80): string | null {
-  const raw = String(value ?? "").trim();
-  if (!raw || raw.length > maxLen) return null;
-  if (!SAFE_DES_RE.test(raw)) return null;
-  return raw;
-}
-
-function setJsonCache(
-  res: Response,
-  maxAgeSec: number,
-  hit: "HIT" | "MISS" | "BYPASS"
-): void {
-  res.setHeader("Cache-Control", `public, max-age=${maxAgeSec}`);
-  res.setHeader("X-Cache", hit);
-}
 
 /**
  * Raw (unfiltered) NEO catalog for a date. Cached 1h + inflight-coalesced so
  * concurrent page/filter requests share one NASA (or mock) load.
  */
-async function getRawAsteroidCatalog(
+export async function getRawAsteroidCatalog(
   startDate: string,
   useMock: boolean
 ): Promise<Asteroid[]> {
@@ -509,7 +448,7 @@ async function getRawAsteroidCatalog(
   const hit = cache.get<Asteroid[]>(rawKey);
   if (hit) return hit;
 
-  const pending = inflightCatalog.get(rawKey);
+  const pending = inflightCatalog.get(rawKey) as Promise<Asteroid[]> | undefined;
   if (pending) return pending;
 
   const load = (async (): Promise<Asteroid[]> => {
@@ -548,7 +487,7 @@ async function getRawAsteroidCatalog(
   return load;
 }
 
-function paginateAsteroids(
+export function paginateAsteroids(
   fullData: Asteroid[],
   pageNum: number,
   limitNum: number,
@@ -586,106 +525,13 @@ function paginateAsteroids(
   };
 }
 
-router.get("/asteroids", async (req: Request, res: Response) => {
-  try {
-    const start_date = parseDateParam(req.query.start_date);
-    const useMock = queryFlag(req.query.mock);
-    const pageNum = parsePositiveInt(req.query.page, 1);
-    const limitNum = parseLimit(req.query.limit, 10);
-    const filterHazardous = queryFlag(req.query.hazardous);
 
-    // Page envelope cache (cheap hits for repeated same page)
-    const pageCacheKey = `neo_page_v5_${start_date}_${useMock ? "m" : "r"}_${filterHazardous}_${pageNum}_${limitNum}`;
-    const cachedPage = cache.get<PaginatedResponse<Asteroid>>(pageCacheKey);
-    if (cachedPage) {
-      setJsonCache(res, PAGE_TTL_SEC, "HIT");
-      res.json(cachedPage);
-      return;
-    }
-
-    // Raw catalog is shared across pages + hazardous filter
-    const rawData = await getRawAsteroidCatalog(start_date, useMock);
-    const totalHazardous = rawData.reduce(
-      (n, a) => n + (a.isHazardous ? 1 : 0),
-      0
-    );
-    const fullData = filterHazardous
-      ? rawData.filter((a) => a.isHazardous)
-      : rawData;
-
-    const responseData = paginateAsteroids(
-      fullData,
-      pageNum,
-      limitNum,
-      totalHazardous
-    );
-
-    cache.set(pageCacheKey, responseData, PAGE_TTL_SEC);
-    setJsonCache(res, PAGE_TTL_SEC, "MISS");
-    res.json(responseData);
-  } catch (e: unknown) {
-    const err = e as {
-      message?: string;
-      code?: string;
-      response?: { status?: number };
-    };
-    console.error("API error:", err.message ?? err);
-    const status =
-      err.response?.status === 429
-        ? 429
-        : err.code === "ECONNABORTED"
-          ? 504
-          : 500;
-    res.status(status).json({
-      error:
-        status === 429
-          ? "NASA rate limit — try again shortly"
-          : status === 504
-            ? "Upstream timeout"
-            : "API fetch failed",
-    });
-  }
-});
-
-router.get("/planets", (req: Request, res: Response) => {
-  try {
-    const pageNum = parsePositiveInt(req.query.page, 1);
-    const limitNum = parseLimit(req.query.limit, 8, 16);
-    const totalItems = ALL_PLANETS.length;
-    const start = (pageNum - 1) * limitNum;
-
-    if (start >= totalItems) {
-      res.status(400).json({ error: "Page out of range" });
-      return;
-    }
-
-    // Static data — long browser + CDN cache; no NodeCache needed
-    setJsonCache(res, 86_400, "BYPASS");
-    res.json({
-      data: ALL_PLANETS.slice(start, start + limitNum),
-      pagination: {
-        currentPage: pageNum,
-        totalPages: Math.ceil(totalItems / limitNum),
-        totalItems,
-        limit: limitNum,
-      },
-    } satisfies PaginatedResponse<Planet>);
-  } catch (e: unknown) {
-    const err = e as { message?: string };
-    console.error("Planet API error:", err.message);
-    res.status(500).json({ error: "Planet fetch failed" });
-  }
-});
 
 /**
  * Mean Keplerian-style elements used by the visualizer.
  * Not live JPL Horizons ephemerides — documented for portfolio honesty.
  * For true sky positions, wire JPL Horizons / SPICE offline and swap this payload.
  */
-router.get("/ephemeris/meta", (_req: Request, res: Response) => {
-  setJsonCache(res, 86_400, "BYPASS");
-  res.json(EPHEMERIS_META);
-});
 
 type SbdbUpstream = {
   code?: number;
@@ -709,12 +555,12 @@ type SbdbUpstream = {
  * P3 — JPL SBDB lookup (free, no key). One designation → cached 24h.
  * GET /api/sbdb?sstr=2015%20AB
  */
-async function fetchSbdb(sstr: string): Promise<SbdbOrbitResult> {
+export async function fetchSbdb(sstr: string): Promise<SbdbOrbitResult> {
   const key = `sbdb_v1_${sstr.toLowerCase()}`;
   const hit = cache.get<SbdbOrbitResult>(key);
   if (hit) return hit;
 
-  const pending = inflightSbdb.get(key);
+  const pending = inflightSbdb.get(key) as Promise<SbdbOrbitResult> | undefined;
   if (pending) return pending;
 
   const load = (async (): Promise<SbdbOrbitResult> => {
@@ -800,52 +646,18 @@ async function fetchSbdb(sstr: string): Promise<SbdbOrbitResult> {
   return load;
 }
 
-router.get("/sbdb", async (req: Request, res: Response) => {
-  try {
-    const raw = parseDesignation(req.query.sstr ?? req.query.des);
-    if (!raw) {
-      res.status(400).json({
-        error:
-          "Query sstr required (max 80 chars; letters, digits, spaces, . - _ ( ) + /)",
-      });
-      return;
-    }
-
-    const cacheKey = `sbdb_v1_${raw.toLowerCase()}`;
-    const cached = cache.get<SbdbOrbitResult>(cacheKey);
-    if (cached) {
-      setJsonCache(res, cached.found ? SBDB_TTL_SEC : 600, "HIT");
-      res.json(cached);
-      return;
-    }
-
-    const result = await fetchSbdb(raw);
-    setJsonCache(res, result.found ? SBDB_TTL_SEC : 600, "MISS");
-    res.json(result);
-  } catch (e: unknown) {
-    const err = e as { message?: string; code?: string };
-    console.error("SBDB error:", err.message ?? err);
-    res.status(err.code === "ECONNABORTED" ? 504 : 502).json({
-      error: "SBDB fetch failed",
-      found: false,
-      query: parseDesignation(req.query.sstr) ?? "",
-    });
-  }
-});
 
 /* ------------------------------------------------------------------ */
 /*  P5 — ISS (free) + CNEOS Sentry watchlist (free)                    */
 /* ------------------------------------------------------------------ */
 
-const inflightIss = new Map<string, Promise<IssPosition>>();
-const inflightSentry = new Map<string, Promise<SentryWatchlist>>();
 
-async function fetchIssPosition(): Promise<IssPosition> {
+export async function fetchIssPosition(): Promise<IssPosition> {
   const key = "iss_now";
   const hit = cache.get<IssPosition>(key);
   if (hit) return hit;
 
-  const pending = inflightIss.get(key);
+  const pending = inflightIss.get(key) as Promise<IssPosition> | undefined;
   if (pending) return pending;
 
   const load = (async (): Promise<IssPosition> => {
@@ -916,25 +728,6 @@ async function fetchIssPosition(): Promise<IssPosition> {
   return load;
 }
 
-router.get("/iss", async (_req: Request, res: Response) => {
-  try {
-    const hit = cache.get<IssPosition>("iss_now");
-    if (hit) {
-      setJsonCache(res, ISS_TTL_SEC, "HIT");
-      res.json(hit);
-      return;
-    }
-    const pos = await fetchIssPosition();
-    setJsonCache(res, ISS_TTL_SEC, "MISS");
-    res.json(pos);
-  } catch (e: unknown) {
-    const err = e as { message?: string; code?: string };
-    console.error("ISS error:", err.message ?? err);
-    res.status(err.code === "ECONNABORTED" ? 504 : 502).json({
-      error: "ISS position unavailable",
-    });
-  }
-});
 
 type SentryRow = {
   des?: string;
@@ -948,7 +741,7 @@ type SentryRow = {
   last_obs?: string;
 };
 
-function mapSentryRow(row: SentryRow): SentryWatchItem {
+export function mapSentryRow(row: SentryRow): SentryWatchItem {
   const ip = Number(row.ip);
   const psCum = Number(row.ps_cum);
   const tsMax = Number(row.ts_max);
@@ -1029,7 +822,7 @@ const SENTRY_FALLBACK_ITEMS: SentryWatchItem[] = [
   },
 ];
 
-function sentryFallback(limit: number, reason: string): SentryWatchlist {
+export function sentryFallback(limit: number, reason: string): SentryWatchlist {
   const items = SENTRY_FALLBACK_ITEMS.slice(0, Math.max(1, limit));
   return {
     count: items.length,
@@ -1046,7 +839,7 @@ const JPL_HEADERS = {
   "User-Agent": "ORBIT-portfolio/1.0 (educational; contact local-dev)",
 };
 
-async function axiosGetJson<T>(
+export async function axiosGetJson<T>(
   url: string,
   timeout: number,
   retries = 1
@@ -1072,14 +865,14 @@ async function axiosGetJson<T>(
 }
 
 /** Last good live list (survives short outages better than TTL-only). */
-let lastGoodSentry: SentryWatchlist | null = null;
+export let lastGoodSentry: SentryWatchlist | null = null;
 
-async function fetchSentryWatchlist(limit: number): Promise<SentryWatchlist> {
+export async function fetchSentryWatchlist(limit: number): Promise<SentryWatchlist> {
   const key = `sentry_s_v2_${limit}`;
   const hit = cache.get<SentryWatchlist>(key);
   if (hit && !hit.degraded) return hit;
 
-  const pending = inflightSentry.get(key);
+  const pending = inflightSentry.get(key) as Promise<SentryWatchlist> | undefined;
   if (pending) return pending;
 
   const load = (async (): Promise<SentryWatchlist> => {
@@ -1150,34 +943,8 @@ async function fetchSentryWatchlist(limit: number): Promise<SentryWatchlist> {
   return load;
 }
 
-router.get("/sentry", async (req: Request, res: Response) => {
-  try {
-    const limit = Math.min(40, parsePositiveInt(req.query.limit, 15));
-    const key = `sentry_s_v2_${limit}`;
-    const cached = cache.get<SentryWatchlist>(key);
-    if (cached) {
-      setJsonCache(res, cached.degraded ? 60 : SENTRY_TTL_SEC, "HIT");
-      res.json(cached);
-      return;
-    }
-    const list = await fetchSentryWatchlist(limit);
-    // Always 200 — UI gets data even when CNEOS is 502 (degraded sample)
-    setJsonCache(res, list.degraded ? 60 : SENTRY_TTL_SEC, "MISS");
-    res.json(list);
-  } catch (e: unknown) {
-    const err = e as { message?: string; code?: string };
-    console.error("Sentry list error:", err.message ?? err);
-    // Last resort — never leave the panel empty with hard 502
-    const fb = sentryFallback(
-      Math.min(40, parsePositiveInt(req.query.limit, 15)),
-      err.message ?? "unexpected error"
-    );
-    setJsonCache(res, 60, "MISS");
-    res.json(fb);
-  }
-});
 
-function detailFromWatchItem(
+export function detailFromWatchItem(
   item: SentryWatchItem,
   reason: string
 ): SentryDetail {
@@ -1197,7 +964,7 @@ function detailFromWatchItem(
   };
 }
 
-function findWatchItemByDes(des: string): SentryWatchItem | null {
+export function findWatchItemByDes(des: string): SentryWatchItem | null {
   const q = des.toLowerCase().replace(/[()]/g, "").trim();
   const pools: SentryWatchItem[] = [
     ...(lastGoodSentry?.items ?? []),
@@ -1213,129 +980,6 @@ function findWatchItemByDes(des: string): SentryWatchItem | null {
   );
 }
 
-router.get("/sentry/:des", async (req: Request, res: Response) => {
-  const des = parseDesignation(req.params.des, 40);
-  if (!des) {
-    res.status(400).json({
-      error: "Invalid designation",
-      found: false,
-      des: String(req.params.des ?? "").slice(0, 40),
-      note: SENTRY_EDU_NOTE,
-    });
-    return;
-  }
-  const key = `sentry_o_v2_${des.toLowerCase()}`;
-  const cached = cache.get<SentryDetail>(key);
-  if (cached) {
-    setJsonCache(res, cached.degraded ? 90 : SENTRY_TTL_SEC, "HIT");
-    res.json(cached);
-    return;
-  }
-
-  try {
-    const body = await axiosGetJson<{
-      summary?: {
-        des?: string;
-        fullname?: string;
-        ip?: string;
-        ps_cum?: string;
-        ps_max?: string;
-        ts_max?: string;
-        diameter?: string;
-        v_imp?: string;
-        n_imp?: string;
-        method?: string;
-      };
-      error?: string;
-    }>(
-      `https://ssd-api.jpl.nasa.gov/sentry.api?des=${encodeURIComponent(des)}`,
-      SENTRY_TIMEOUT_MS,
-      1
-    );
-
-    const sum = body.summary;
-    if (!sum || body.error) {
-      // Prefer watchlist/fallback summary over hard miss when CNEOS says not found
-      // only if we have local data (e.g. degraded list)
-      const local = findWatchItemByDes(des);
-      if (local) {
-        const d = detailFromWatchItem(
-          local,
-          body.error ?? "no mode-O summary"
-        );
-        cache.set(key, d, 120);
-        setJsonCache(res, 120, "MISS");
-        res.json(d);
-        return;
-      }
-      const miss: SentryDetail = {
-        found: false,
-        des,
-        message: body.error ?? "Not on Sentry list",
-        note: SENTRY_EDU_NOTE,
-      };
-      cache.set(key, miss, 3600);
-      setJsonCache(res, 3600, "MISS");
-      res.json(miss);
-      return;
-    }
-
-    const detail: SentryDetail = {
-      found: true,
-      des: sum.des ?? des,
-      fullname: sum.fullname,
-      ip: Number(sum.ip),
-      psCum: Number(sum.ps_cum),
-      psMax: Number(sum.ps_max),
-      tsMax: Number(sum.ts_max),
-      diameterKm: sum.diameter != null ? Number(sum.diameter) : null,
-      vImp: sum.v_imp != null ? Number(sum.v_imp) : null,
-      nImp: sum.n_imp != null ? Number(sum.n_imp) : null,
-      method: sum.method ?? null,
-      note: SENTRY_EDU_NOTE,
-      degraded: false,
-    };
-    cache.set(key, detail, SENTRY_TTL_SEC);
-    setJsonCache(res, SENTRY_TTL_SEC, "MISS");
-    res.json(detail);
-  } catch (e: unknown) {
-    const err = e as {
-      message?: string;
-      code?: string;
-      response?: { status?: number };
-    };
-    const status = err.response?.status;
-    const reason =
-      status === 502 || status === 503
-        ? `CNEOS API HTTP ${status}`
-        : err.code === "ECONNABORTED"
-          ? "CNEOS timeout"
-          : err.message ?? "CNEOS unreachable";
-    console.warn("Sentry detail live failed, using summary fallback:", reason);
-
-    const local = findWatchItemByDes(des);
-    if (local) {
-      const d = detailFromWatchItem(local, reason);
-      cache.set(key, d, 90);
-      setJsonCache(res, 90, "MISS");
-      res.json(d);
-      return;
-    }
-
-    // Always 200 — client keeps briefing usable from list row data
-    const soft: SentryDetail = {
-      found: false,
-      des,
-      message: `Live Sentry detail unavailable (${reason}). Watchlist row data still shown.`,
-      note: SENTRY_EDU_NOTE,
-      degraded: true,
-      degradedReason: reason,
-    };
-    cache.set(key, soft, 60);
-    setJsonCache(res, 60, "MISS");
-    res.json(soft);
-  }
-});
 
 /* ------------------------------------------------------------------ */
 /*  P6 — DONKI solar activity badge (free NASA key)                      */
@@ -1352,140 +996,9 @@ export type DonkiSolarBadge = {
   degraded?: boolean;
 };
 
-router.get("/donki/solar", async (_req: Request, res: Response) => {
-  const key = "donki_solar_v1";
-  const cached = cache.get<DonkiSolarBadge>(key);
-  if (cached) {
-    setJsonCache(res, cached.degraded ? 120 : 1800, "HIT");
-    res.json(cached);
-    return;
-  }
-
-  const apiKey = process.env.NASA_API_KEY;
-  if (!apiKey) {
-    const quiet: DonkiSolarBadge = {
-      active: false,
-      level: "quiet",
-      label: "Solar: quiet (no API key)",
-      detail: "Set NASA_API_KEY for live DONKI flares / geomagnetic storms",
-      flares24h: 0,
-      gstMaxKp: null,
-      source: "NASA DONKI (unavailable)",
-      degraded: true,
-    };
-    cache.set(key, quiet, 300);
-    setJsonCache(res, 300, "MISS");
-    res.json(quiet);
-    return;
-  }
-
-  try {
-    const end = new Date();
-    const start = new Date(end.getTime() - 48 * 3600 * 1000);
-    const fmt = (d: Date) => d.toISOString().slice(0, 10);
-    const [flaresRes, gstRes] = await Promise.all([
-      axios
-        .get<Array<{ classType?: string; beginTime?: string }>>(
-          `https://api.nasa.gov/DONKI/FLR?startDate=${fmt(start)}&endDate=${fmt(end)}&api_key=${encodeURIComponent(apiKey)}`,
-          { timeout: 12_000, validateStatus: (s) => s >= 200 && s < 500 }
-        )
-        .catch(() => ({ data: [] as Array<{ classType?: string }> })),
-      axios
-        .get<
-          Array<{
-            allKpIndex?: Array<{ kpIndex?: number }>;
-          }>
-        >(
-          `https://api.nasa.gov/DONKI/GST?startDate=${fmt(start)}&endDate=${fmt(end)}&api_key=${encodeURIComponent(apiKey)}`,
-          { timeout: 12_000, validateStatus: (s) => s >= 200 && s < 500 }
-        )
-        .catch(() => ({ data: [] as Array<{ allKpIndex?: Array<{ kpIndex?: number }> }> })),
-    ]);
-
-    const flares = Array.isArray(flaresRes.data) ? flaresRes.data : [];
-    const gst = Array.isArray(gstRes.data) ? gstRes.data : [];
-    let maxKp: number | null = null;
-    for (const g of gst) {
-      for (const k of g.allKpIndex ?? []) {
-        const v = Number(k.kpIndex);
-        if (Number.isFinite(v)) maxKp = maxKp == null ? v : Math.max(maxKp, v);
-      }
-    }
-    const mClass = flares.filter((f) =>
-      String(f.classType ?? "").toUpperCase().startsWith("M")
-    ).length;
-    const xClass = flares.filter((f) =>
-      String(f.classType ?? "").toUpperCase().startsWith("X")
-    ).length;
-
-    let level: DonkiSolarBadge["level"] = "quiet";
-    if (xClass > 0 || (maxKp != null && maxKp >= 6)) level = "storm";
-    else if (mClass > 0 || flares.length >= 3 || (maxKp != null && maxKp >= 4))
-      level = "elevated";
-
-    const badge: DonkiSolarBadge = {
-      active: level !== "quiet",
-      level,
-      label:
-        level === "storm"
-          ? "Solar: storm watch"
-          : level === "elevated"
-            ? "Solar: elevated"
-            : "Solar: quiet",
-      detail: `${flares.length} flare(s) · ${mClass} M / ${xClass} X · max Kp ${
-        maxKp != null ? maxKp.toFixed(1) : "—"
-      } (48h)`,
-      flares24h: flares.length,
-      gstMaxKp: maxKp,
-      source: "NASA DONKI",
-    };
-    cache.set(key, badge, 1800);
-    setJsonCache(res, 1800, "MISS");
-    res.json(badge);
-  } catch (e: unknown) {
-    const err = e as { message?: string };
-    console.warn("DONKI error:", err.message);
-    const soft: DonkiSolarBadge = {
-      active: false,
-      level: "quiet",
-      label: "Solar: data offline",
-      detail: "DONKI unreachable — solar badge paused",
-      flares24h: 0,
-      gstMaxKp: null,
-      source: "NASA DONKI (unavailable)",
-      degraded: true,
-    };
-    cache.set(key, soft, 120);
-    setJsonCache(res, 120, "MISS");
-    res.json(soft);
-  }
-});
 
 /**
  * Debug / ops: NodeCache hit rates + key counts (no payload data).
  * Useful when verifying NEO cache behaviour during demos.
  */
-router.get("/cache-stats", (_req: Request, res: Response) => {
-  res.setHeader("Cache-Control", "no-store");
-  const stats = cache.getStats();
-  res.json({
-    keys: cache.keys().length,
-    maxKeys: 500,
-    hits: stats.hits,
-    misses: stats.misses,
-    ksize: stats.ksize,
-    vsize: stats.vsize,
-    inflightCatalogs: inflightCatalog.size,
-    inflightSbdb: inflightSbdb.size,
-    inflightIss: inflightIss.size,
-    inflightSentry: inflightSentry.size,
-    mockLoaded: mockAsteroidsMem != null,
-    fullTtlSec: FULL_TTL_SEC,
-    pageTtlSec: PAGE_TTL_SEC,
-    sbdbTtlSec: SBDB_TTL_SEC,
-    sentryTtlSec: SENTRY_TTL_SEC,
-    issTtlSec: ISS_TTL_SEC,
-  });
-});
 
-export default router;
