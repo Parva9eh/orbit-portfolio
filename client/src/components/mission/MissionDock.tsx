@@ -4,6 +4,7 @@ import {
   site,
   type MissionStepId,
 } from "../../content/site";
+import ContactForm from "./ContactForm";
 
 function Chip({ children }: { children: ReactNode }) {
   return (
@@ -118,11 +119,16 @@ function CommsBody() {
         data-rich 3D experiences. Happy to walk through ORBIT live or dig into
         architecture (API cache, scene split, mission state).
       </p>
-      <p className="text-sm text-gray-400">{site.email}</p>
-      <p className="text-[11px] text-gray-600 mt-2">
-        Replace name, email, and LinkedIn in{" "}
-        <code className="text-gray-500">client/src/content/site.ts</code>.
+      <p className="text-[10px] uppercase tracking-wider text-cyan-300/80 font-semibold mb-1.5">
+        Secure channel
       </p>
+      <ContactForm />
+      {site.social.linkedin.endsWith("/in/") && (
+        <p className="text-[11px] text-gray-600 mt-2">
+          Add your LinkedIn URL in{" "}
+          <code className="text-gray-500">client/src/content/site.ts</code>.
+        </p>
+      )}
     </>
   );
 }
@@ -143,6 +149,8 @@ export default function MissionDock({
   let title = site.name;
   let role = site.role;
   let body: ReactNode = <BriefingBody />;
+  const showResume = Boolean(site.resumeUrl && site.resumeUrl !== "#");
+
   let foot: ReactNode = (
     <>
       <button
@@ -152,12 +160,16 @@ export default function MissionDock({
       >
         View projects
       </button>
-      <a
-        href={site.resumeUrl}
-        className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold border border-white/15 text-white hover:border-sky-300 hover:text-sky-300"
-      >
-        Resume PDF
-      </a>
+      {showResume && (
+        <a
+          href={site.resumeUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold border border-white/15 text-white hover:border-sky-300 hover:text-sky-300"
+        >
+          Resume PDF
+        </a>
+      )}
     </>
   );
 
@@ -209,30 +221,27 @@ export default function MissionDock({
     title = "Transmission";
     role = "Let's connect";
     body = <CommsBody />;
+    const linkedInReady = !site.social.linkedin.endsWith("/in/");
     foot = (
       <>
-        <a
-          href={`mailto:${site.email}`}
-          className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-custom-blue text-white"
-        >
-          Email
-        </a>
         <a
           href={site.social.github}
           target="_blank"
           rel="noreferrer"
-          className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold border border-white/15 text-white hover:border-sky-300"
+          className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-custom-blue text-white"
         >
           GitHub
         </a>
-        <a
-          href={site.social.linkedin}
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold border border-white/15 text-white hover:border-sky-300"
-        >
-          LinkedIn
-        </a>
+        {linkedInReady && (
+          <a
+            href={site.social.linkedin}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold border border-white/15 text-white hover:border-sky-300"
+          >
+            LinkedIn
+          </a>
+        )}
       </>
     );
   }

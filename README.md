@@ -45,7 +45,16 @@ http://localhost:5173/?mode=live
 http://localhost:5173/?mode=live&view=nearEarth&issFocus=1
 ```
 
-Personal portfolio copy (name, email, LinkedIn, resume) lives in `client/src/content/site.ts`.
+Portfolio identity (name, LinkedIn, resume, projects) lives in `client/src/content/site.ts`.
+
+**Comms** uses a **contact form** (Web3Forms), not a public email address. Create a free key at [web3forms.com](https://web3forms.com), set your inbox there, then:
+
+```bash
+# client/.env  (and Vercel → Environment Variables for production builds)
+VITE_WEB3FORMS_ACCESS_KEY=your_access_key
+```
+
+Without the key, Comms still works via GitHub / LinkedIn; the form shows as offline.
 
 ---
 
@@ -145,25 +154,46 @@ Set `VITE_API_URL` at build time if the SPA is not served from the same host as 
 
 ## Deploy
 
-| Piece | Guidance |
-| --- | --- |
-| **API** | Node 20+ with `NASA_API_KEY`, `PORT`, and production `CORS_ORIGIN` |
-| **SPA** | Host `client/dist` as static files |
-| **Same origin** | Proxy `/api` and `/health` to Express; leave `VITE_API_URL` unset so the client uses `/api` |
-| **Split origin** | Build with `VITE_API_URL=https://api.example.com/api`; set `CORS_ORIGIN` to the SPA origin |
-| **Health** | Point load balancers at `GET /health` |
+ORBIT is two processes: a **static SPA** (`client/dist`) and a **long-running Express API** (`server`).
 
-Example production server env:
+### Can it run only on Vercel?
+
+| Goal | Vercel alone? | Notes |
+| --- | --- | --- |
+| **Portfolio SPA** | **Yes** | Deploy `client` as static files (`vercel.json` at repo root). |
+| **Full Live NEO experience** | **Not with this Express server as-is** | Vercel favors static + short serverless. This API is a classic Node process with multi-second upstream calls and in-memory cache. |
+| **Practical setup** | **Vercel SPA + small always-on API** | e.g. Railway / Render / Fly / VPS for `server`. |
+
+So: **UI-only on Vercel works**; **Live data needs a Node host** (or a future serverless API rewrite).
+
+### Recommended: Vercel (SPA) + Node API
+
+**API** (Node 20 host):
+
+```bash
+cd server && npm install && npm run start
+```
 
 ```bash
 NASA_API_KEY=your_key
 PORT=8000
 HOST=0.0.0.0
 NODE_ENV=production
-CORS_ORIGIN=https://your-spa.example
+CORS_ORIGIN=https://your-app.vercel.app
 ```
 
-Before a public deploy: use a real NASA key (rotate if it was ever shared), lock CORS, serve HTTPS, and re-run hygiene + smoke against the target stack.
+**SPA on Vercel:** import the repo; root `vercel.json` builds `client` → `client/dist`. Set build-time env:
+
+| Variable | Purpose |
+| --- | --- |
+| `VITE_API_URL` | Absolute API base ending in `/api` (split-origin deploy) |
+| `VITE_WEB3FORMS_ACCESS_KEY` | Contact form (optional; Comms) |
+
+SPA without an API: Briefing/Projects/Comms load; Live catalog calls will fail until an API is configured.
+
+### Same-origin alternative
+
+Reverse-proxy `/api` and `/health` to Express and leave `VITE_API_URL` unset so the client uses relative `/api`.
 
 ---
 
@@ -184,6 +214,7 @@ Before a public deploy: use a real NASA key (rotate if it was ever shared), lock
 | Variable | Notes |
 | --- | --- |
 | `VITE_API_URL` | Absolute API base including `/api` (e.g. `https://api.example.com/api`). Dev default: `http://localhost:8000/api` |
+| `VITE_WEB3FORMS_ACCESS_KEY` | Web3Forms access key for Comms. Your real inbox is only on their dashboard — never in source. |
 
 ---
 
