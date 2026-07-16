@@ -343,7 +343,7 @@ export function ActionBar({
             type="button"
             onClick={onExportSummary}
             className="text-[11px] font-semibold px-2 py-1 rounded-md border bg-violet-500/15 text-violet-100 border-violet-400/30 hover:bg-violet-500/25"
-            title="Copy plain-text briefing for demos / LinkedIn"
+            title="Copy plain-text briefing for demos or sharing"
           >
             {exportStatus === "copied"
               ? "Summary copied"
