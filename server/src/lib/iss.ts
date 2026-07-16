@@ -10,6 +10,7 @@ import {
   cache,
   ISS_TTL_SEC,
   ISS_TIMEOUT_MS,
+  ISS_ENRICH_TIMEOUT_MS,
   inflightIss,
 } from "./cache.ts";
 
@@ -19,6 +20,8 @@ const TLE_TTL_SEC = 3600;
 const TRAIL_POINTS = 10;
 /** Seconds between trail samples (~2 min × 10 ≈ 20 min arc) */
 const TRAIL_STEP_SEC = 120;
+/** Sparse fallback — cache briefly so we retry WTIA soon */
+const OPEN_NOTIFY_TTL_SEC = 6;
 
 type WtiaSatellite = {
   name?: string;
@@ -63,7 +66,6 @@ function parseVisibility(raw: string | undefined): IssVisibility {
 function parseTleInclinationDeg(line2: string | undefined): number | null {
   if (!line2) return null;
   const parts = line2.trim().split(/\s+/);
-  // "2 25544 51.6311 ..." → inclination at index 2
   const i = Number(parts[2]);
   return Number.isFinite(i) ? i : null;
 }
@@ -74,7 +76,7 @@ async function fetchTle(): Promise<IssTle | null> {
   if (hit) return hit;
   try {
     const r = await axios.get<WtiaTles>(`${WTIA}/satellites/${ISS_NORAD}/tles`, {
-      timeout: ISS_TIMEOUT_MS,
+      timeout: ISS_ENRICH_TIMEOUT_MS,
     });
     const d = r.data;
     if (!d.line1 || !d.line2) return null;
@@ -88,7 +90,11 @@ async function fetchTle(): Promise<IssTle | null> {
     };
     cache.set(key, tle, TLE_TTL_SEC);
     return tle;
-  } catch {
+  } catch (e) {
+    console.warn(
+      "[iss] TLE enrich failed:",
+      e instanceof Error ? e.message : e
+    );
     return null;
   }
 }
@@ -98,15 +104,15 @@ async function fetchGround(
   lon: number
 ): Promise<IssGroundContext | null> {
   try {
-    // API path is lat,lon per public docs title; both orders tried if needed
     const r = await axios.get<WtiaCoords>(
       `${WTIA}/coordinates/${lat},${lon}`,
-      { timeout: ISS_TIMEOUT_MS }
+      { timeout: ISS_ENRICH_TIMEOUT_MS }
     );
     const d = r.data;
     return {
       timezoneId: d.timezone_id ?? null,
-      offsetHours: d.offset != null && Number.isFinite(d.offset) ? d.offset : null,
+      offsetHours:
+        d.offset != null && Number.isFinite(d.offset) ? d.offset : null,
       countryCode: d.country_code ?? null,
     };
   } catch {
@@ -124,7 +130,7 @@ async function fetchTrail(nowSec: number): Promise<IssTrailSample[]> {
       `${WTIA}/satellites/${ISS_NORAD}/positions`,
       {
         params: { timestamps: stamps.join(",") },
-        timeout: ISS_TIMEOUT_MS + 4000,
+        timeout: ISS_ENRICH_TIMEOUT_MS,
       }
     );
     const list = Array.isArray(r.data) ? r.data : [];
@@ -137,7 +143,11 @@ async function fetchTrail(nowSec: number): Promise<IssTrailSample[]> {
           d.timestamp != null ? Number(d.timestamp) * 1000 : Date.now(),
       }))
       .filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lon));
-  } catch {
+  } catch (e) {
+    console.warn(
+      "[iss] trail enrich failed:",
+      e instanceof Error ? e.message : e
+    );
     return [];
   }
 }
@@ -163,6 +173,10 @@ function emptyExtras(): Pick<
   };
 }
 
+/**
+ * Core position first (Where The ISS At), then best-effort enrichments.
+ * Falls back to Open Notify lat/lon only when WTIA is unreachable.
+ */
 export async function fetchIssPosition(): Promise<IssPosition> {
   const key = "iss_now_v2";
   const hit = cache.get<IssPosition>(key);
@@ -173,18 +187,23 @@ export async function fetchIssPosition(): Promise<IssPosition> {
 
   const load = (async (): Promise<IssPosition> => {
     try {
-      // Prefer HTTPS Where The ISS At (rich telemetry)
+      // 1) Primary — rich telemetry (often slow; timeout must be generous)
       try {
         const r = await axios.get<WtiaSatellite>(
           `${WTIA}/satellites/${ISS_NORAD}`,
           {
             params: { units: "kilometers" },
             timeout: ISS_TIMEOUT_MS,
+            headers: { Accept: "application/json" },
           }
         );
         const d = r.data;
         const lat = Number(d.latitude);
         const lon = Number(d.longitude);
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+          throw new Error("WTIA returned non-finite coordinates");
+        }
+
         const timestampMs =
           d.timestamp != null ? Number(d.timestamp) * 1000 : Date.now();
         const nowSec =
@@ -192,11 +211,9 @@ export async function fetchIssPosition(): Promise<IssPosition> {
             ? Number(d.timestamp)
             : Math.floor(Date.now() / 1000);
 
-        // Enrich in parallel (best-effort)
+        // 2) Enrich in parallel — each fails soft; don't discard core telemetry
         const [ground, trail, tle] = await Promise.all([
-          Number.isFinite(lat) && Number.isFinite(lon)
-            ? fetchGround(lat, lon)
-            : Promise.resolve(null),
+          fetchGround(lat, lon),
           fetchTrail(nowSec),
           fetchTle(),
         ]);
@@ -218,27 +235,32 @@ export async function fetchIssPosition(): Promise<IssPosition> {
           trail,
           tle,
         };
-        if (Number.isFinite(pos.lat) && Number.isFinite(pos.lon)) {
-          cache.set(key, pos, ISS_TTL_SEC);
-          return pos;
-        }
-      } catch {
-        /* fall through to Open Notify */
+        cache.set(key, pos, ISS_TTL_SEC);
+        return pos;
+      } catch (e) {
+        console.warn(
+          "[iss] Where The ISS At failed, falling back to Open Notify:",
+          e instanceof Error ? e.message : e
+        );
       }
 
-      // Open Notify (HTTP) — free, no key; sparse fields
+      // 3) Open Notify — lat/lon only (no alt/vel/visibility)
       const r2 = await axios.get<{
         iss_position?: { latitude?: string; longitude?: string };
         timestamp?: number;
       }>("http://api.open-notify.org/iss-now.json", {
-        timeout: ISS_TIMEOUT_MS,
+        timeout: 8_000,
       });
       const lat = Number(r2.data.iss_position?.latitude);
       const lon = Number(r2.data.iss_position?.longitude);
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+        throw new Error("Invalid ISS coordinates from Open Notify");
+      }
       const pos: IssPosition = {
         lat,
         lon,
-        altKm: 420,
+        // Do not pretend we measured altitude
+        altKm: null,
         velocityKmS: null,
         timestampMs:
           r2.data.timestamp != null
@@ -247,10 +269,7 @@ export async function fetchIssPosition(): Promise<IssPosition> {
         source: "open-notify",
         ...emptyExtras(),
       };
-      if (!Number.isFinite(pos.lat) || !Number.isFinite(pos.lon)) {
-        throw new Error("Invalid ISS coordinates");
-      }
-      cache.set(key, pos, ISS_TTL_SEC);
+      cache.set(key, pos, OPEN_NOTIFY_TTL_SEC);
       return pos;
     } finally {
       inflightIss.delete(key);
