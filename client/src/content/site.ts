@@ -1,6 +1,9 @@
 /**
- * Portfolio content — fill personal placeholders (name, email, social).
+ * Portfolio content for the Mission Control shell.
  * UI reads only from this module so copy stays out of the 3D layer.
+ *
+ * Contact: use the Comms form (Web3Forms) — do not put a personal email here.
+ * Set VITE_WEB3FORMS_ACCESS_KEY in the client env (see client/.env.example).
  */
 
 export type MissionStepId = "briefing" | "projects" | "live" | "comms";
@@ -30,7 +33,7 @@ export type SiteContent = {
   summary: string;
   location: string;
   openToWork: boolean;
-  email: string;
+  /** Public resume link, or `#` to hide the Resume control */
   resumeUrl: string;
   social: {
     github: string;
@@ -42,19 +45,18 @@ export type SiteContent = {
 
 export const site: SiteContent = {
   brand: "ORBIT",
-  name: "Your Name",
+  name: "Parvaneh",
   role: "Frontend · Creative Tech",
   tagline:
     "Immersive web experiences — data-driven APIs, mission-control UI, and interactive 3D.",
   summary:
     "I design and ship portfolio-grade product UIs: TypeScript full-stack, real science APIs, and React Three Fiber scenes that stay readable under load. ORBIT is the live demo — NeoWs close approaches, SBDB orbits, ISS, and Sentry briefing in one Mission Control shell.",
-  location: "City, Country",
+  location: "Earth · remote-friendly",
   openToWork: true,
-  email: "you@example.com",
   resumeUrl: "#",
   social: {
-    github: "https://github.com/Parva9eh/orbit-portfolio",
-    linkedin: "https://linkedin.com/in/",
+    github: "https://github.com/Parva9eh",
+    linkedin: "https://www.linkedin.com/in/",
   },
   skills: [
     "React",
@@ -76,26 +78,6 @@ export const site: SiteContent = {
       live: true,
       href: null,
       repo: "https://github.com/Parva9eh/orbit-portfolio",
-    },
-    {
-      id: "project-two",
-      title: "Project Two",
-      blurb: "Replace with another shipped project — one line on problem + outcome.",
-      stack: ["Stack", "Tags"],
-      featured: false,
-      live: false,
-      href: "#",
-      repo: null,
-    },
-    {
-      id: "project-three",
-      title: "Project Three",
-      blurb: "Replace with a third card when ready (or remove from the list).",
-      stack: ["Stack", "Tags"],
-      featured: false,
-      live: false,
-      href: "#",
-      repo: null,
     },
   ],
 };
