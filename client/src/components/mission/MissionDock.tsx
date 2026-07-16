@@ -230,7 +230,9 @@ export default function MissionDock({
   return (
     <aside
       className="absolute z-20 flex flex-col overflow-hidden rounded-xl border border-white/10 bg-[#0f1623]/cc backdrop-blur-md shadow-2xl
-        left-3 right-3 bottom-12 max-h-[42vh]
+        left-3 right-3 bottom-12 max-h-[min(42vh,22rem)]
+        max-md:max-h-[min(38dvh,18rem)]
+        safe-pad-x
         md:left-4 md:right-auto md:top-16 md:bottom-14 md:w-[min(360px,92vw)] md:max-h-none"
       aria-live="polite"
     >

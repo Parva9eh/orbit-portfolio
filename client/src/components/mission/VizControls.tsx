@@ -47,11 +47,14 @@ type VizControlsProps = {
    * bottom-right / bottom-center placement.
    */
   embedded?: boolean;
+  /** Phone layout: denser spacing, secondary controls in a details block */
+  compact?: boolean;
 };
 
 export default function VizControls({
   onScreenshot,
   embedded = false,
+  compact = false,
 }: VizControlsProps) {
   const {
     timeScale,
@@ -101,7 +104,6 @@ export default function VizControls({
     }
   }, [audioEnabled]);
 
-  // Mission clock readout (~4Hz, not every frame in React)
   useEffect(() => {
     const id = window.setInterval(() => {
       setClockLabel(formatSimClock(getSimTime()).label);
@@ -122,17 +124,94 @@ export default function VizControls({
     return () => window.removeEventListener("orbit-sfx-click", handler);
   }, [playClick]);
 
+  const chip = (active: boolean) =>
+    `px-2 py-1.5 rounded-md font-semibold transition-colors tap-target ${
+      active
+        ? "bg-custom-blue text-white"
+        : "bg-black/40 hover:bg-white/10 text-gray-300"
+    }`;
+
+  const secondary = (
+    <>
+      <div className="flex items-center gap-1 flex-wrap">
+        <span className="text-cyan-300/90 uppercase tracking-wider text-[0.62rem] mr-1">
+          Quality
+        </span>
+        {QUALITY.map((q) => (
+          <button
+            key={q.value}
+            type="button"
+            onClick={() => setQuality(q.value)}
+            className={chip(quality === q.value)}
+          >
+            {q.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="flex flex-wrap gap-x-3 gap-y-1.5">
+        <label className="inline-flex items-center gap-1.5 cursor-pointer py-1">
+          <input
+            type="checkbox"
+            checked={trueScale}
+            onChange={(e) => setTrueScale(e.target.checked)}
+            className="accent-custom-blue h-3.5 w-3.5"
+          />
+          True-scale
+        </label>
+        <label className="inline-flex items-center gap-1.5 cursor-pointer py-1">
+          <input
+            type="checkbox"
+            checked={showLabels}
+            onChange={(e) => setShowLabels(e.target.checked)}
+            className="accent-custom-blue h-3.5 w-3.5"
+          />
+          Labels
+        </label>
+        <label className="inline-flex items-center gap-1.5 cursor-pointer py-1">
+          <input
+            type="checkbox"
+            checked={audioEnabled}
+            onChange={(e) => setAudioEnabled(e.target.checked)}
+            className="accent-custom-blue h-3.5 w-3.5"
+          />
+          Audio
+        </label>
+      </div>
+
+      <button
+        type="button"
+        onClick={() => {
+          playClick();
+          onScreenshot?.();
+        }}
+        className="w-full px-2 py-1.5 rounded-md bg-black/50 border border-white/10 hover:border-sky-400/50 font-semibold tap-target"
+      >
+        Screenshot
+      </button>
+      {!embedded && (
+        <p className="text-[0.6rem] text-gray-500 leading-snug">
+          NASA NEO data = near-Earth approaches. Prefer{" "}
+          <strong className="text-gray-400">Near-Earth</strong> view for Live
+          mode. System view is for planets; main-belt rocks need different
+          data.
+        </p>
+      )}
+    </>
+  );
+
   return (
     <div
       className={
         embedded
-          ? "relative w-full flex flex-col gap-1.5 p-2 rounded-xl border border-white/10 bg-[#0f1623]/95 backdrop-blur-md text-[0.7rem] text-gray-300 shadow-xl"
+          ? `relative w-full flex flex-col gap-1.5 p-2 rounded-xl border border-white/10 bg-[#0f1623]/95 backdrop-blur-md text-[0.7rem] text-gray-300 shadow-xl ${
+              compact ? "max-h-[40dvh] overflow-y-auto overscroll-contain" : ""
+            }`
           : "absolute z-30 bottom-12 left-1/2 -translate-x-1/2 md:left-auto md:right-4 md:translate-x-0 md:bottom-14 flex flex-col gap-2 p-2.5 rounded-xl border border-white/10 bg-[#0f1623]/90 backdrop-blur-md text-[0.7rem] text-gray-300 shadow-xl max-w-[min(92vw,300px)]"
       }
       role="toolbar"
       aria-label="Visualization controls"
     >
-      {/* Mission clock */}
       <div className="flex items-center justify-between gap-2 px-1">
         <span className="text-cyan-300/90 uppercase tracking-wider text-[0.62rem]">
           Mission clock
@@ -142,8 +221,7 @@ export default function VizControls({
         </span>
       </div>
 
-      {/* Time scale */}
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1 flex-wrap">
         <span className="text-cyan-300/90 uppercase tracking-wider text-[0.62rem] mr-1">
           Time
         </span>
@@ -152,11 +230,7 @@ export default function VizControls({
             key={s.value}
             type="button"
             onClick={() => setTimeScale(s.value)}
-            className={`px-2 py-1 rounded-md font-semibold transition-colors ${
-              timeScale === s.value
-                ? "bg-custom-blue text-white"
-                : "bg-black/40 hover:bg-white/10 text-gray-300"
-            }`}
+            className={chip(timeScale === s.value)}
             title={s.value === 0 ? "Pause" : `${s.value}× speed`}
           >
             {s.label}
@@ -164,8 +238,7 @@ export default function VizControls({
         ))}
       </div>
 
-      {/* Camera director */}
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1 flex-wrap">
         <span className="text-cyan-300/90 uppercase tracking-wider text-[0.62rem] mr-1">
           Cam
         </span>
@@ -174,11 +247,7 @@ export default function VizControls({
             key={c.value}
             type="button"
             onClick={() => setCameraMode(c.value)}
-            className={`px-2 py-1 rounded-md font-semibold transition-colors ${
-              cameraMode === c.value
-                ? "bg-custom-blue text-white"
-                : "bg-black/40 hover:bg-white/10 text-gray-300"
-            }`}
+            className={chip(cameraMode === c.value)}
             title={
               c.value === "free"
                 ? "Manual orbit controls"
@@ -192,8 +261,7 @@ export default function VizControls({
         ))}
       </div>
 
-      {/* Multi-scale view */}
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1 flex-wrap">
         <span className="text-cyan-300/90 uppercase tracking-wider text-[0.62rem] mr-1">
           View
         </span>
@@ -203,85 +271,22 @@ export default function VizControls({
             type="button"
             title={v.title}
             onClick={() => setViewScale(v.value)}
-            className={`px-2 py-1 rounded-md font-semibold transition-colors ${
-              viewScale === v.value
-                ? "bg-custom-blue text-white"
-                : "bg-black/40 hover:bg-white/10 text-gray-300"
-            }`}
+            className={chip(viewScale === v.value)}
           >
-            {v.label}
+            {compact && v.value === "nearEarth" ? "Near" : v.label}
           </button>
         ))}
       </div>
 
-      {/* Quality */}
-      <div className="flex items-center gap-1">
-        <span className="text-cyan-300/90 uppercase tracking-wider text-[0.62rem] mr-1">
-          Quality
-        </span>
-        {QUALITY.map((q) => (
-          <button
-            key={q.value}
-            type="button"
-            onClick={() => setQuality(q.value)}
-            className={`px-2 py-1 rounded-md font-semibold transition-colors ${
-              quality === q.value
-                ? "bg-custom-blue text-white"
-                : "bg-black/40 hover:bg-white/10 text-gray-300"
-            }`}
-          >
-            {q.label}
-          </button>
-        ))}
-      </div>
-
-      <div className="flex flex-wrap gap-x-3 gap-y-1.5">
-        <label className="inline-flex items-center gap-1.5 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={trueScale}
-            onChange={(e) => setTrueScale(e.target.checked)}
-            className="accent-custom-blue"
-          />
-          True-scale
-        </label>
-        <label className="inline-flex items-center gap-1.5 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={showLabels}
-            onChange={(e) => setShowLabels(e.target.checked)}
-            className="accent-custom-blue"
-          />
-          Labels
-        </label>
-        <label className="inline-flex items-center gap-1.5 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={audioEnabled}
-            onChange={(e) => setAudioEnabled(e.target.checked)}
-            className="accent-custom-blue"
-          />
-          Audio
-        </label>
-      </div>
-
-      <button
-        type="button"
-        onClick={() => {
-          playClick();
-          onScreenshot?.();
-        }}
-        className="w-full px-2 py-1.5 rounded-md bg-black/50 border border-white/10 hover:border-sky-400/50 font-semibold"
-      >
-        Screenshot
-      </button>
-      {!embedded && (
-        <p className="text-[0.6rem] text-gray-500 leading-snug">
-          NASA NEO data = near-Earth approaches. Prefer{" "}
-          <strong className="text-gray-400">Near-Earth</strong> view for Live
-          mode. System view is for planets; main-belt rocks need different
-          data.
-        </p>
+      {compact ? (
+        <details className="rounded-md border border-white/10 bg-black/20 px-2 py-1">
+          <summary className="cursor-pointer text-[10px] uppercase tracking-wider text-cyan-300/90 py-1 select-none">
+            More · quality, labels, screenshot
+          </summary>
+          <div className="flex flex-col gap-1.5 pb-1 pt-0.5">{secondary}</div>
+        </details>
+      ) : (
+        secondary
       )}
     </div>
   );

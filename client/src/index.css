@@ -10,10 +10,46 @@ body,
   height: 100%;
   background: #070b12;
   color: #f7fafc;
+  /* Avoid iOS rubber-band scrolling the whole app behind fixed chrome */
+  overscroll-behavior: none;
 }
 
 body {
   overflow: hidden;
+  /* Smooth text on mobile Safari */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Prefer device-safe dark chrome (notch / home indicator) */
+@supports (padding: env(safe-area-inset-top)) {
+  .safe-pad-x {
+    padding-left: max(0.75rem, env(safe-area-inset-left));
+    padding-right: max(0.75rem, env(safe-area-inset-right));
+  }
+  .safe-pad-t {
+    padding-top: max(0.5rem, env(safe-area-inset-top));
+  }
+  .safe-pad-b {
+    padding-bottom: max(0.35rem, env(safe-area-inset-bottom));
+  }
+}
+
+/* Hide horizontal scrollbar on compact step strip without killing scroll */
+.scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+/* Comfortable tap targets for primary controls */
+@layer utilities {
+  .tap-target {
+    min-height: 2.25rem;
+    min-width: 2.25rem;
+  }
 }
 
 .animate-fade-in {
@@ -28,5 +64,13 @@ body {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+/* Reduce motion for accessibility */
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in,
+  .animate-pulse {
+    animation: none !important;
   }
 }
