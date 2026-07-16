@@ -45,7 +45,16 @@ http://localhost:5173/?mode=live
 http://localhost:5173/?mode=live&view=nearEarth&issFocus=1
 ```
 
-Personal portfolio copy (name, email, LinkedIn, resume) lives in `client/src/content/site.ts`.
+Portfolio identity (name, LinkedIn, resume, projects) lives in `client/src/content/site.ts`.
+
+**Comms** uses a **contact form** (Web3Forms), not a public email address. Create a free key at [web3forms.com](https://web3forms.com), set your inbox there, then:
+
+```bash
+# client/.env  (and Vercel → Environment Variables for production builds)
+VITE_WEB3FORMS_ACCESS_KEY=your_access_key
+```
+
+Without the key, Comms still works via GitHub / LinkedIn; the form shows as offline.
 
 ---
 
@@ -145,25 +154,58 @@ Set `VITE_API_URL` at build time if the SPA is not served from the same host as 
 
 ## Deploy
 
-| Piece | Guidance |
+**Preferred stack** for full Live NEO + contact form:
+
+| Piece | Host |
 | --- | --- |
-| **API** | Node 20+ with `NASA_API_KEY`, `PORT`, and production `CORS_ORIGIN` |
-| **SPA** | Host `client/dist` as static files |
-| **Same origin** | Proxy `/api` and `/health` to Express; leave `VITE_API_URL` unset so the client uses `/api` |
-| **Split origin** | Build with `VITE_API_URL=https://api.example.com/api`; set `CORS_ORIGIN` to the SPA origin |
-| **Health** | Point load balancers at `GET /health` |
+| Domain DNS | **GoDaddy** (domain can stay here) |
+| SPA | **Vercel** (`vercel.json` → `client/dist`) |
+| API | **Render** Web Service (`server`) |
+| Contact form | **Web3Forms** → optional `you@yourdomain.com` |
+| Inbox (optional) | Microsoft 365 from GoDaddy (or any mailbox) |
 
-Example production server env:
-
-```bash
-NASA_API_KEY=your_key
-PORT=8000
-HOST=0.0.0.0
-NODE_ENV=production
-CORS_ORIGIN=https://your-spa.example
+```
+you@domain  ←── Web3Forms
+Browser → Vercel (SPA) ──VITE_API_URL──→ Render /api
+              └── form──→ Web3Forms
 ```
 
-Before a public deploy: use a real NASA key (rotate if it was ever shared), lock CORS, serve HTTPS, and re-run hygiene + smoke against the target stack.
+### 1. Render (API)
+
+- Web Service from this repo; root directory **`server`**
+- Build: `npm install` · Start: `npm run start` (Node 20)
+- Env: `NASA_API_KEY`, `NODE_ENV=production`, `HOST=0.0.0.0`,  
+  `CORS_ORIGIN=https://yourdomain.com,https://www.yourdomain.com`  
+  (Render injects `PORT` — the server already reads it)
+- Check: `https://YOUR-SERVICE.onrender.com/health`
+
+Optional blueprint: `render.yaml` at the repo root.
+
+### 2. Web3Forms (Comms)
+
+- Access key at web3forms.com; set delivery email to `you@yourdomain.com` (not in client source)
+- Pass key to Vercel as `VITE_WEB3FORMS_ACCESS_KEY`
+
+### 3. Vercel (SPA)
+
+- Import repo; production env then **redeploy**:
+
+| Variable | Example |
+| --- | --- |
+| `VITE_API_URL` | `https://YOUR-SERVICE.onrender.com/api` |
+| `VITE_WEB3FORMS_ACCESS_KEY` | (from Web3Forms) |
+
+Never put `NASA_API_KEY` on Vercel.
+
+### 4. GoDaddy DNS
+
+In Vercel → Domains, add your domain and **copy the A/CNAME records Vercel shows** into GoDaddy DNS. Keep **MX** records if you use GoDaddy/M365 email. Prefer one canonical host (apex or `www`) and redirect the other.
+
+### 5. Verify
+
+Live list loads · Comms test message arrives · no NASA key or personal email in the client bundle.
+
+**Notes:** Render free tier may sleep (slow first request). Use 2FA on GoDaddy, Vercel, Render, GitHub, and Web3Forms.
 
 ---
 
@@ -184,6 +226,7 @@ Before a public deploy: use a real NASA key (rotate if it was ever shared), lock
 | Variable | Notes |
 | --- | --- |
 | `VITE_API_URL` | Absolute API base including `/api` (e.g. `https://api.example.com/api`). Dev default: `http://localhost:8000/api` |
+| `VITE_WEB3FORMS_ACCESS_KEY` | Web3Forms access key for Comms. Your real inbox is only on their dashboard — never in source. |
 
 ---
 
