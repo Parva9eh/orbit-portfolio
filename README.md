@@ -154,25 +154,23 @@ Set `VITE_API_URL` at build time if the SPA is not served from the same host as 
 
 ## Deploy
 
-ORBIT is two processes: a **static SPA** (`client/dist`) and a **long-running Express API** (`server`).
+Full Live NEO (catalog, SBDB, ISS, Sentry, solar) needs both:
 
-### Can it run only on Vercel?
+1. **SPA** — static files from `client/dist`
+2. **API** — always-on Node process running `server` (Express + cache + NASA/CNEOS proxies)
 
-| Goal | Vercel alone? | Notes |
+The **contact form** does not need your API: it posts to Web3Forms from the browser. Set `VITE_WEB3FORMS_ACCESS_KEY` on the SPA build only.
+
+### Recommended: Vercel (SPA) + Railway or Render (API)
+
+This is the lowest-friction path for the full product.
+
+| Piece | Host | Why |
 | --- | --- | --- |
-| **Portfolio SPA** | **Yes** | Deploy `client` as static files (`vercel.json` at repo root). |
-| **Full Live NEO experience** | **Not with this Express server as-is** | Vercel favors static + short serverless. This API is a classic Node process with multi-second upstream calls and in-memory cache. |
-| **Practical setup** | **Vercel SPA + small always-on API** | e.g. Railway / Render / Fly / VPS for `server`. |
+| UI | **Vercel** | Static Vite build, HTTPS, previews (`vercel.json` at repo root) |
+| API | **Railway** or **Render** (or Fly.io) | Long-running Node, multi-second upstream calls, in-memory cache works |
 
-So: **UI-only on Vercel works**; **Live data needs a Node host** (or a future serverless API rewrite).
-
-### Recommended: Vercel (SPA) + Node API
-
-**API** (Node 20 host):
-
-```bash
-cd server && npm install && npm run start
-```
+**API env** (Railway / Render / similar):
 
 ```bash
 NASA_API_KEY=your_key
@@ -182,18 +180,22 @@ NODE_ENV=production
 CORS_ORIGIN=https://your-app.vercel.app
 ```
 
-**SPA on Vercel:** import the repo; root `vercel.json` builds `client` → `client/dist`. Set build-time env:
+Start: `cd server && npm install && npm run start` (or platform start command with `tsx` / a build step).
+
+**Vercel (SPA) env** (build-time):
 
 | Variable | Purpose |
 | --- | --- |
-| `VITE_API_URL` | Absolute API base ending in `/api` (split-origin deploy) |
-| `VITE_WEB3FORMS_ACCESS_KEY` | Contact form (optional; Comms) |
+| `VITE_API_URL` | Absolute API base ending in `/api`, e.g. `https://orbit-api.up.railway.app/api` |
+| `VITE_WEB3FORMS_ACCESS_KEY` | Comms form (Web3Forms) |
 
-SPA without an API: Briefing/Projects/Comms load; Live catalog calls will fail until an API is configured.
+### Same-origin (one domain)
 
-### Same-origin alternative
+Put nginx, Caddy, or a PaaS reverse proxy in front: serve `client/dist`, proxy `/api` and `/health` to Express, leave `VITE_API_URL` unset so the client uses relative `/api`. Contact form env still goes on the SPA build.
 
-Reverse-proxy `/api` and `/health` to Express and leave `VITE_API_URL` unset so the client uses relative `/api`.
+### Single always-on host (no Vercel)
+
+Run API + serve the built SPA from the same Node/nginx box (Docker, VPS, or Railway with static + API). Slightly more setup, one billable service.
 
 ---
 
