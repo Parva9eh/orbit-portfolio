@@ -239,7 +239,7 @@ export default function LiveNeoPanel({ embedded = false }: LiveNeoPanelProps) {
           type="button"
           disabled={safePage <= 1 || loading}
           onClick={() => onPageChange(safePage - 1)}
-          className="px-2.5 py-1.5 rounded bg-custom-blue text-white disabled:opacity-40"
+          className="px-3 py-2 rounded bg-custom-blue text-white disabled:opacity-40 tap-target font-semibold"
         >
           Prev
         </button>
@@ -250,7 +250,7 @@ export default function LiveNeoPanel({ embedded = false }: LiveNeoPanelProps) {
           type="button"
           disabled={safePage >= safeTotal || loading}
           onClick={() => onPageChange(safePage + 1)}
-          className="px-2.5 py-1.5 rounded bg-custom-blue text-white disabled:opacity-40"
+          className="px-3 py-2 rounded bg-custom-blue text-white disabled:opacity-40 tap-target font-semibold"
         >
           Next
         </button>
