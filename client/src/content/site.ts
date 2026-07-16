@@ -37,7 +37,6 @@ export type SiteContent = {
   resumeUrl: string;
   social: {
     github: string;
-    linkedin: string;
   };
   skills: string[];
   projects: Project[];
@@ -56,7 +55,6 @@ export const site: SiteContent = {
   resumeUrl: "#",
   social: {
     github: "https://github.com/Parva9eh",
-    linkedin: "https://www.linkedin.com/in/",
   },
   skills: [
     "React",
