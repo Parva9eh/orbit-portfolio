@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="ORBIT">
+  <defs>
+    <radialGradient id="bg" cx="40%" cy="35%" r="70%">
+      <stop offset="0%" stop-color="#0f1a2e"/>
+      <stop offset="100%" stop-color="#05080f"/>
+    </radialGradient>
+    <radialGradient id="sun" cx="35%" cy="35%" r="65%">
+      <stop offset="0%" stop-color="#fff4c8"/>
+      <stop offset="45%" stop-color="#fbbf24"/>
+      <stop offset="100%" stop-color="#ea580c"/>
+    </radialGradient>
+    <linearGradient id="orbit" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7dd3fc" stop-opacity="0.95"/>
+      <stop offset="100%" stop-color="#38bdf8" stop-opacity="0.55"/>
+    </linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="0.6" result="b"/>
+      <feMerge>
+        <feMergeNode in="b"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <!-- Rounded dark field -->
+  <rect width="32" height="32" rx="7" fill="url(#bg)"/>
+  <!-- Soft star field -->
+  <circle cx="6" cy="7" r="0.55" fill="#e2e8f0" opacity="0.55"/>
+  <circle cx="26" cy="9" r="0.45" fill="#e2e8f0" opacity="0.4"/>
+  <circle cx="24" cy="24" r="0.5" fill="#e2e8f0" opacity="0.45"/>
+  <circle cx="8" cy="25" r="0.4" fill="#e2e8f0" opacity="0.35"/>
+  <!-- Orbital path (ellipse) -->
+  <ellipse
+    cx="16" cy="16"
+    rx="11" ry="6.5"
+    fill="none"
+    stroke="url(#orbit)"
+    stroke-width="1.35"
+    transform="rotate(-28 16 16)"
+    opacity="0.95"
+  />
+  <!-- Sun -->
+  <circle cx="16" cy="16" r="4.2" fill="url(#sun)" filter="url(#glow)"/>
+  <circle cx="14.8" cy="14.8" r="1.2" fill="#fffbeb" opacity="0.55"/>
+  <!-- NEO / craft on orbit (upper-right) -->
+  <g transform="rotate(-28 16 16)">
+    <circle cx="27" cy="16" r="1.55" fill="#7dd3fc" filter="url(#glow)"/>
+    <circle cx="26.6" cy="15.6" r="0.45" fill="#f0f9ff" opacity="0.85"/>
+  </g>
+</svg>
