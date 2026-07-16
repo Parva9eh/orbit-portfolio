@@ -2,32 +2,107 @@ import { useState, type FormEvent } from "react";
 
 type Status = "idle" | "sending" | "sent" | "error";
 
+type FieldErrors = {
+  name?: string;
+  email?: string;
+  message?: string;
+};
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function FieldLabel({
+  htmlFor,
+  children,
+  required: isRequired,
+}: {
+  htmlFor: string;
+  children: string;
+  required?: boolean;
+}) {
+  return (
+    <label htmlFor={htmlFor} className="block">
+      <span className="text-[10px] uppercase tracking-wider text-gray-500">
+        {children}
+        {isRequired && (
+          <span className="text-sky-400/90 normal-case tracking-normal ml-1" aria-hidden>
+            *
+          </span>
+        )}
+      </span>
+    </label>
+  );
+}
+
+const inputClass =
+  "mt-0.5 w-full px-2.5 py-1.5 rounded-md border bg-[#0c121c] text-white text-sm placeholder:text-gray-600 disabled:opacity-50";
+const inputOk = "border-white/10";
+const inputErr = "border-amber-400/50 focus:outline-none focus:ring-1 focus:ring-amber-400/40";
+
 /**
- * Portfolio contact form — delivers via Web3Forms so your email never appears
- * in the SPA. Set `VITE_WEB3FORMS_ACCESS_KEY` (from https://web3forms.com).
- * Without a key, the form stays disabled and social links remain the path.
+ * Portfolio contact form — Web3Forms delivery (your inbox never appears in the SPA).
+ * Set `VITE_WEB3FORMS_ACCESS_KEY` (https://web3forms.com).
  */
 export default function ContactForm() {
-  const accessKey = (import.meta.env.VITE_WEB3FORMS_ACCESS_KEY as string | undefined)?.trim() ?? "";
+  const accessKey =
+    (import.meta.env.VITE_WEB3FORMS_ACCESS_KEY as string | undefined)?.trim() ??
+    "";
   const configured = accessKey.length > 0;
 
   const [status, setStatus] = useState<Status>("idle");
   const [errorDetail, setErrorDetail] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+
+  function validate(data: FormData): FieldErrors {
+    const errors: FieldErrors = {};
+    const name = String(data.get("name") ?? "").trim();
+    const email = String(data.get("email") ?? "").trim();
+    const message = String(data.get("message") ?? "").trim();
+
+    if (!name) errors.name = "Name is required";
+    if (!email) errors.email = "Your email is required so we can reply";
+    else if (!EMAIL_RE.test(email)) errors.email = "Enter a valid email address";
+    if (!message) errors.message = "Message is required";
+    else if (message.length < 10)
+      errors.message = "Please write a bit more (at least a sentence)";
+
+    return errors;
+  }
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!configured || status === "sending") return;
+    if (status === "sending") return;
 
     const form = e.currentTarget;
     const data = new FormData(form);
+
     // Honeypot — bots fill this; real users leave it empty
     if (String(data.get("botcheck") ?? "")) {
       setStatus("sent");
       return;
     }
 
+    const errors = validate(data);
+    setFieldErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      setStatus("idle");
+      setErrorDetail(null);
+      return;
+    }
+
+    if (!configured) {
+      setErrorDetail(
+        "Form is offline in this build — set VITE_WEB3FORMS_ACCESS_KEY, or use GitHub."
+      );
+      setStatus("error");
+      return;
+    }
+
     setStatus("sending");
     setErrorDetail(null);
+
+    const name = String(data.get("name") ?? "").trim();
+    const email = String(data.get("email") ?? "").trim();
+    const message = String(data.get("message") ?? "").trim();
 
     try {
       const res = await fetch("https://api.web3forms.com/submit", {
@@ -38,10 +113,12 @@ export default function ContactForm() {
         },
         body: JSON.stringify({
           access_key: accessKey,
-          subject: data.get("subject") || "ORBIT portfolio — transmission",
-          name: data.get("name"),
-          email: data.get("email"),
-          message: data.get("message"),
+          subject: "ORBIT portfolio — transmission",
+          name,
+          email,
+          // Web3Forms uses this for Reply-To on the message you receive
+          replyto: email,
+          message,
           from_name: "ORBIT Mission Control",
         }),
       });
@@ -50,6 +127,7 @@ export default function ContactForm() {
         throw new Error(json.message || `Submit failed (${res.status})`);
       }
       setStatus("sent");
+      setFieldErrors({});
       form.reset();
     } catch (err) {
       setStatus("error");
@@ -57,21 +135,12 @@ export default function ContactForm() {
     }
   }
 
-  if (!configured) {
-    return (
-      <p className="text-[11px] text-gray-500 leading-snug border border-white/10 rounded-lg px-2.5 py-2 bg-black/20">
-        Contact form offline in this build. Use GitHub or LinkedIn below, or set{" "}
-        <code className="text-gray-400">VITE_WEB3FORMS_ACCESS_KEY</code> at build
-        time (Web3Forms — your inbox address stays off the page).
-      </p>
-    );
-  }
-
   if (status === "sent") {
     return (
       <div className="rounded-lg border border-emerald-500/25 bg-emerald-950/20 px-2.5 py-2 space-y-2">
         <p className="text-sm text-emerald-200/90">
-          Transmission received — thanks for reaching out.
+          Transmission received — thanks for reaching out. I’ll reply to the
+          email you provided.
         </p>
         <button
           type="button"
@@ -84,72 +153,140 @@ export default function ContactForm() {
     );
   }
 
+  const busy = status === "sending";
+
   return (
-    <form onSubmit={onSubmit} className="space-y-2" noValidate>
+    <form onSubmit={onSubmit} className="space-y-2.5" noValidate>
+      {!configured && (
+        <p className="text-[11px] text-amber-200/80 leading-snug border border-amber-500/20 rounded-lg px-2.5 py-2 bg-amber-950/15">
+          Delivery offline until{" "}
+          <code className="text-amber-100/90">VITE_WEB3FORMS_ACCESS_KEY</code>{" "}
+          is set. You can still fill the form to preview; use GitHub to reach me
+          for now.
+        </p>
+      )}
+
       {/* Honeypot */}
       <input
         type="text"
         name="botcheck"
-        className="hidden"
+        className="absolute opacity-0 pointer-events-none h-0 w-0"
         tabIndex={-1}
         autoComplete="off"
         aria-hidden
       />
-      <label className="block">
-        <span className="text-[10px] uppercase tracking-wider text-gray-500">
+
+      <div>
+        <FieldLabel htmlFor="orbit-contact-name" required>
           Name
-        </span>
+        </FieldLabel>
         <input
+          id="orbit-contact-name"
           name="name"
+          type="text"
           required
+          aria-required="true"
+          aria-invalid={Boolean(fieldErrors.name)}
+          aria-describedby={fieldErrors.name ? "orbit-contact-name-err" : undefined}
           maxLength={120}
-          disabled={status === "sending"}
-          className="mt-0.5 w-full px-2.5 py-1.5 rounded-md border border-white/10 bg-[#0c121c] text-white text-sm placeholder:text-gray-600"
+          disabled={busy}
+          className={`${inputClass} ${fieldErrors.name ? inputErr : inputOk}`}
           placeholder="Your name"
           autoComplete="name"
+          onChange={() =>
+            setFieldErrors((e) => ({ ...e, name: undefined }))
+          }
         />
-      </label>
-      <label className="block">
-        <span className="text-[10px] uppercase tracking-wider text-gray-500">
-          Reply-to
-        </span>
+        {fieldErrors.name && (
+          <p id="orbit-contact-name-err" className="mt-0.5 text-[11px] text-amber-300/90">
+            {fieldErrors.name}
+          </p>
+        )}
+      </div>
+
+      <div>
+        <FieldLabel htmlFor="orbit-contact-email" required>
+          Your email
+        </FieldLabel>
         <input
+          id="orbit-contact-email"
           name="email"
           type="email"
           required
+          aria-required="true"
+          aria-invalid={Boolean(fieldErrors.email)}
+          aria-describedby={
+            fieldErrors.email
+              ? "orbit-contact-email-err"
+              : "orbit-contact-email-hint"
+          }
           maxLength={200}
-          disabled={status === "sending"}
-          className="mt-0.5 w-full px-2.5 py-1.5 rounded-md border border-white/10 bg-[#0c121c] text-white text-sm placeholder:text-gray-600"
-          placeholder="you@domain.com"
+          disabled={busy}
+          className={`${inputClass} ${fieldErrors.email ? inputErr : inputOk}`}
+          placeholder="name@example.com"
           autoComplete="email"
+          inputMode="email"
+          onChange={() =>
+            setFieldErrors((e) => ({ ...e, email: undefined }))
+          }
         />
-      </label>
-      <label className="block">
-        <span className="text-[10px] uppercase tracking-wider text-gray-500">
+        {fieldErrors.email ? (
+          <p id="orbit-contact-email-err" className="mt-0.5 text-[11px] text-amber-300/90">
+            {fieldErrors.email}
+          </p>
+        ) : (
+          <p id="orbit-contact-email-hint" className="mt-0.5 text-[10px] text-gray-600">
+            Required — used only so I can reply (not shown publicly).
+          </p>
+        )}
+      </div>
+
+      <div>
+        <FieldLabel htmlFor="orbit-contact-message" required>
           Message
-        </span>
+        </FieldLabel>
         <textarea
+          id="orbit-contact-message"
           name="message"
           required
+          aria-required="true"
+          aria-invalid={Boolean(fieldErrors.message)}
+          aria-describedby={
+            fieldErrors.message ? "orbit-contact-message-err" : undefined
+          }
           rows={3}
           maxLength={4000}
-          disabled={status === "sending"}
-          className="mt-0.5 w-full px-2.5 py-1.5 rounded-md border border-white/10 bg-[#0c121c] text-white text-sm placeholder:text-gray-600 resize-y min-h-[4.5rem]"
+          disabled={busy}
+          className={`${inputClass} resize-y min-h-[4.5rem] ${
+            fieldErrors.message ? inputErr : inputOk
+          }`}
           placeholder="Roles, collabs, architecture questions…"
+          onChange={() =>
+            setFieldErrors((e) => ({ ...e, message: undefined }))
+          }
         />
-      </label>
-      <input type="hidden" name="subject" value="ORBIT portfolio — transmission" />
+        {fieldErrors.message && (
+          <p
+            id="orbit-contact-message-err"
+            className="mt-0.5 text-[11px] text-amber-300/90"
+          >
+            {fieldErrors.message}
+          </p>
+        )}
+      </div>
+
       <button
         type="submit"
-        disabled={status === "sending"}
+        disabled={busy}
         className="w-full px-3 py-1.5 rounded-md text-xs font-semibold bg-custom-blue text-white disabled:opacity-50"
       >
-        {status === "sending" ? "Sending…" : "Send transmission"}
+        {busy ? "Sending…" : "Send transmission"}
       </button>
+
       {status === "error" && (
-        <p className="text-[11px] text-amber-300/90 leading-snug">
+        <p className="text-[11px] text-amber-300/90 leading-snug" role="alert">
           Could not send{errorDetail ? ` — ${errorDetail}` : ""}. Try again or
-          use GitHub / LinkedIn.
+          use GitHub.
         </p>
       )}
     </form>
