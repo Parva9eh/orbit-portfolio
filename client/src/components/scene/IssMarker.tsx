@@ -35,7 +35,7 @@ export function issOrbitLocal(
 }
 
 /** Seed phase from live longitude so craft starts near telemetry. */
-export function phaseFromIssTelemetry(iss: IssPosition): number {
+export function phaseFromIssTelemetry(iss: { lon: number }): number {
   return ((iss.lon + 180) * DEG + Math.PI * 2) % (Math.PI * 2);
 }
 
@@ -137,6 +137,56 @@ function LeoOrbitRingGlow({
   return <primitive object={line} />;
 }
 
+/** Map recent telemetry samples onto the schematic LEO ring (by longitude phase). */
+function IssTelemetryTrail({
+  trail,
+  orbitR,
+  inclination,
+  focusMode,
+}: {
+  trail: IssPosition["trail"];
+  orbitR: number;
+  inclination: number;
+  focusMode: boolean;
+}) {
+  const line = useMemo(() => {
+    if (!trail || trail.length < 2) return null;
+    const positions = new Float32Array(trail.length * 3);
+    for (let i = 0; i < trail.length; i++) {
+      const phase = phaseFromIssTelemetry(trail[i]);
+      const p = issOrbitLocal(phase, orbitR, inclination);
+      positions[i * 3] = p.x;
+      positions[i * 3 + 1] = p.y;
+      positions[i * 3 + 2] = p.z;
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    const mat = new THREE.LineBasicMaterial({
+      color: 0x38bdf8,
+      transparent: true,
+      opacity: focusMode ? 0.85 : 0.55,
+      depthWrite: false,
+      toneMapped: false,
+    });
+    const obj = new THREE.Line(geo, mat);
+    obj.frustumCulled = false;
+    obj.renderOrder = 7;
+    return obj;
+  }, [trail, orbitR, inclination, focusMode]);
+
+  useEffect(
+    () => () => {
+      if (!line) return;
+      line.geometry.dispose();
+      (line.material as THREE.Material).dispose();
+    },
+    [line]
+  );
+
+  if (!line) return null;
+  return <primitive object={line} />;
+}
+
 type IssMarkerProps = {
   /** Live telemetry when available; omit to use DEFAULT_ISS for immediate ring */
   iss?: IssPosition | null;
@@ -170,6 +220,15 @@ export default function IssMarker({
   const seeded = useRef(false);
   const lastLon = useRef(telemetry.lon);
 
+  // Prefer live TLE inclination for ring when available (still schematic radius)
+  const ringInclination =
+    telemetry.tle?.inclinationDeg != null &&
+    Number.isFinite(telemetry.tle.inclinationDeg)
+      ? telemetry.tle.inclinationDeg * DEG
+      : ISS_INCLINATION;
+  const inclRef = useRef(ringInclination);
+  inclRef.current = ringInclination;
+
   useEffect(() => {
     if (!iss) return; // keep default phase until live data
     if (!seeded.current) {
@@ -196,15 +255,16 @@ export default function IssMarker({
     if (!root.current || !craft.current) return;
 
     root.current.position.copy(earthPos);
+    const inc = inclRef.current;
 
     const angle =
       phase0.current +
       ((simTimeRef.current - phaseSim0.current) / ISS_PERIOD_SIM) * Math.PI * 2;
 
-    tmpLocal.copy(issOrbitLocal(angle, orbitR, ISS_INCLINATION));
+    tmpLocal.copy(issOrbitLocal(angle, orbitR, inc));
     craft.current.position.copy(tmpLocal);
 
-    const next = issOrbitLocal(angle + 0.03, orbitR, ISS_INCLINATION);
+    const next = issOrbitLocal(angle + 0.03, orbitR, inc);
     tmpTan.copy(next).sub(tmpLocal).normalize();
     tmpOut.copy(tmpLocal).normalize();
     tmpBin.crossVectors(tmpOut, tmpTan);
@@ -224,12 +284,18 @@ export default function IssMarker({
       {/* Path first — native lines, no API wait, no Line2 resolution lag */}
       <LeoOrbitRing
         radius={orbitR}
-        inclination={ISS_INCLINATION}
+        inclination={ringInclination}
         focusMode={focusMode}
       />
       <LeoOrbitRingGlow
         radius={orbitR}
-        inclination={ISS_INCLINATION}
+        inclination={ringInclination}
+        focusMode={focusMode}
+      />
+      <IssTelemetryTrail
+        trail={telemetry.trail}
+        orbitR={orbitR}
+        inclination={ringInclination}
         focusMode={focusMode}
       />
 

@@ -1,6 +1,7 @@
 import type { Dispatch } from "react";
 import type { IssPosition } from "@shared";
 import type { LiveMissionAction, LiveMissionState } from "../../mission/liveMissionState";
+import IssBriefing from "./IssBriefing";
 
 type LiveNeoLayerControlsProps = {
   live: LiveMissionState;
@@ -130,6 +131,7 @@ export default function LiveNeoLayerControls({
           {showIss && iss && (
             <span className="text-[10px] text-sky-400/90 tabular-nums font-normal">
               {iss.lat.toFixed(1)}° · {iss.lon.toFixed(1)}°
+              {iss.altKm != null ? ` · ${Math.round(iss.altKm)} km` : ""}
             </span>
           )}
         </label>
@@ -152,6 +154,7 @@ export default function LiveNeoLayerControls({
             Tight orbit of Earth · schematic LEO ring · station enlarged
           </p>
         )}
+        {showIss && iss && <IssBriefing iss={iss} />}
       </div>
 
       <label

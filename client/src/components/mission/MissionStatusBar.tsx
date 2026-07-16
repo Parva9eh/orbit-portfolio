@@ -1,6 +1,8 @@
 import type { CelestialItem, IssPosition } from "@shared";
 import {
   formatEarthRelativeLine,
+  formatIssSampleAge,
+  formatIssVisibility,
   formatMiss,
   formatVelocityKmS,
   isAsteroid,
@@ -82,18 +84,37 @@ export default function MissionStatusBar({
             )}
           </p>
         ) : showIss && iss ? (
-          <p className="truncate text-center text-sky-300/90 tabular-nums tracking-wide">
+          <p
+            className="truncate text-center text-sky-300/90 tabular-nums tracking-wide"
+            title={[
+              formatIssVisibility(iss.visibility),
+              iss.velocityKmS != null
+                ? `${iss.velocityKmS.toFixed(2)} km/s`
+                : null,
+              iss.ground?.timezoneId,
+              formatIssSampleAge(iss.timestampMs),
+              iss.source,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
+          >
             <span className="text-gray-500 font-normal">
               {issFocus ? "ISS focus · " : "ISS · "}
             </span>
             {iss.lat.toFixed(2)}° · {iss.lon.toFixed(2)}°
-            {iss.altKm != null && (
-              <> · {Math.round(iss.altKm)} km</>
+            {iss.altKm != null && <> · {Math.round(iss.altKm)} km</>}
+            {iss.visibility !== "unknown" && (
+              <span className="hidden md:inline text-sky-200/80">
+                {" "}
+                · {formatIssVisibility(iss.visibility)}
+              </span>
             )}
-            <span className="text-gray-600 hidden sm:inline">
-              {" "}
-              · {iss.source}
-            </span>
+            {iss.velocityKmS != null && (
+              <span className="hidden lg:inline text-gray-400">
+                {" "}
+                · {iss.velocityKmS.toFixed(2)} km/s
+              </span>
+            )}
           </p>
         ) : (
           <p className="truncate text-center text-gray-500 hidden md:block">

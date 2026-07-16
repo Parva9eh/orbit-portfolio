@@ -45,6 +45,9 @@ export {
   formatAu,
   formatRulerDistance,
   formatExportSummary,
+  formatIssSampleAge,
+  formatIssVisibility,
+  formatIssVelocityDisplay,
 } from "./format";
 
 export type { SbdbOrbitResult, SbdbElement } from "./sbdb";
@@ -57,6 +60,10 @@ export {
 
 export type {
   IssPosition,
+  IssVisibility,
+  IssTrailSample,
+  IssGroundContext,
+  IssTle,
   SentryWatchItem,
   SentryWatchlist,
   SentryDetail,
