@@ -155,7 +155,8 @@ export function useMissionFeeds({
   } = useSbdbOrbit(selectedAsteroid);
 
   const issEnabled = showIss && mode === "live";
-  const { iss } = useIssPosition(issEnabled);
+  const { iss, isLive: issLive, acquiring: issAcquiring } =
+    useIssPosition(issEnabled);
   const {
     list: sentryList,
     loading: sentryLoading,
@@ -180,6 +181,8 @@ export function useMissionFeeds({
     sbdbLoading,
     sbdbError,
     iss,
+    issLive,
+    issAcquiring,
     sentryList,
     sentryLoading,
     sentryError,

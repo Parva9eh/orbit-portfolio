@@ -8,18 +8,51 @@ import {
 
 type IssBriefingProps = {
   iss: IssPosition;
+  /** True while only the local seed is available (before first live sample) */
+  acquiring?: boolean;
 };
 
 /**
  * Educational ISS telemetry card — altitude, velocity, daylight/shadow,
  * footprint, ground context, TLE inclination, sample age.
  */
-export default function IssBriefing({ iss }: IssBriefingProps) {
+export default function IssBriefing({
+  iss,
+  acquiring = false,
+}: IssBriefingProps) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const t = window.setInterval(() => setNow(Date.now()), 5000);
     return () => window.clearInterval(t);
   }, []);
+
+  const isMock = iss.source === "mock" || acquiring;
+
+  if (isMock) {
+    return (
+      <div
+        className="ml-6 mb-2 rounded-md border border-sky-500/20 bg-sky-950/25 p-2 space-y-1.5"
+        aria-label="ISS telemetry acquiring"
+        aria-busy="true"
+      >
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-[10px] uppercase tracking-wider text-sky-300/90 font-semibold">
+            ISS telemetry
+          </p>
+          <span className="text-[10px] text-amber-300/90 animate-pulse">
+            acquiring…
+          </span>
+        </div>
+        <p className="text-[11px] text-gray-400 leading-snug">
+          LEO ring is ready. Waiting for live lat/lon, altitude, and velocity
+          (Where The ISS At can take 10–20s on first contact).
+        </p>
+        <div className="h-1.5 rounded-full bg-sky-950/80 overflow-hidden">
+          <div className="h-full w-1/3 rounded-full bg-sky-400/50 animate-pulse" />
+        </div>
+      </div>
+    );
+  }
 
   const vis = formatIssVisibility(iss.visibility);
   const visClass =
