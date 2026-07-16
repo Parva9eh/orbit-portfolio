@@ -41,8 +41,8 @@ function ProjectsBody({ onEnterLive }: { onEnterLive: () => void }) {
     <>
       {site.projects.map((p) => (
         <div key={p.id} className="mb-4 last:mb-0">
-          <h3 className="text-white text-base font-semibold mb-1">
-            {p.title}
+          <h3 className="text-white text-base font-semibold mb-1 flex flex-wrap items-center gap-1">
+            <span>{p.title}</span>
             {p.featured && <Chip>Featured</Chip>}
             {p.live && <Chip>Live</Chip>}
           </h3>
@@ -52,15 +52,37 @@ function ProjectsBody({ onEnterLive }: { onEnterLive: () => void }) {
               <Chip key={t}>{t}</Chip>
             ))}
           </div>
-          {p.live && (
-            <button
-              type="button"
-              onClick={onEnterLive}
-              className="mt-2 text-sm font-semibold text-sky-300 hover:text-sky-200"
-            >
-              Enter live system →
-            </button>
-          )}
+          <div className="mt-2 flex flex-wrap gap-3">
+            {p.live && (
+              <button
+                type="button"
+                onClick={onEnterLive}
+                className="text-sm font-semibold text-sky-300 hover:text-sky-200"
+              >
+                Enter live system →
+              </button>
+            )}
+            {p.repo && (
+              <a
+                href={p.repo}
+                target="_blank"
+                rel="noreferrer"
+                className="text-sm font-semibold text-gray-400 hover:text-sky-300"
+              >
+                Repo
+              </a>
+            )}
+            {p.href && p.href !== "#" && (
+              <a
+                href={p.href}
+                target="_blank"
+                rel="noreferrer"
+                className="text-sm font-semibold text-gray-400 hover:text-sky-300"
+              >
+                Open
+              </a>
+            )}
+          </div>
         </div>
       ))}
     </>
@@ -71,12 +93,18 @@ function LiveBody() {
   return (
     <>
       <p className="mb-3">
-        Same canvas, denser data. Use the right panel for search, hazard filter,
-        planets, and the NEO list — Astro Explorer docked into the portfolio.
+        Live NEO tools are on the <strong className="text-gray-300">right rail</strong>{" "}
+        — catalog, filters, compare, Sentry, ruler, and guided tours. The canvas
+        stays full-viewport; Mission Control chrome does not cover the scene.
+      </p>
+      <p className="text-sm text-gray-500 mb-2">
+        <strong className="text-gray-400">Demo path:</strong> Guided tours →
+        Closest today → select + Compare → Show ISS / Focus ISS → optional Sentry
+        pick. Copy link to share the same briefing.
       </p>
       <p className="text-sm text-gray-500">
-        Toggle <strong className="text-gray-300">Live NEO</strong> anytime to
-        show or hide mission tools without leaving this page.
+        Near-Earth view is honest for miss distances; System view is for planets
+        and SBDB heliocentric orbits.
       </p>
     </>
   );
@@ -85,10 +113,16 @@ function LiveBody() {
 function CommsBody() {
   return (
     <>
-      <p className="mb-3 text-gray-400 italic opacity-80">
-        Short invite for roles, collabs, or chats about creative frontends.
+      <p className="mb-3 text-gray-400">
+        Open to roles and collabs in product frontend, creative tech, and
+        data-rich 3D experiences. Happy to walk through ORBIT live or dig into
+        architecture (API cache, scene split, mission state).
       </p>
       <p className="text-sm text-gray-400">{site.email}</p>
+      <p className="text-[11px] text-gray-600 mt-2">
+        Replace name, email, and LinkedIn in{" "}
+        <code className="text-gray-500">client/src/content/site.ts</code>.
+      </p>
     </>
   );
 }
