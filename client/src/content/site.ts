@@ -1,5 +1,5 @@
 /**
- * Portfolio content — fill these placeholders later.
+ * Portfolio content — fill personal placeholders (name, email, social).
  * UI reads only from this module so copy stays out of the 3D layer.
  */
 
@@ -45,34 +45,42 @@ export const site: SiteContent = {
   name: "Your Name",
   role: "Frontend · Creative Tech",
   tagline:
-    "I build immersive web experiences — from data-driven APIs to interactive 3D scenes.",
+    "Immersive web experiences — data-driven APIs, mission-control UI, and interactive 3D.",
   summary:
-    "Short bio — who you are, what you build, and why space, data, or creative tech shows up in your work. Replace this with 2–4 real sentences.",
+    "I design and ship portfolio-grade product UIs: TypeScript full-stack, real science APIs, and React Three Fiber scenes that stay readable under load. ORBIT is the live demo — NeoWs close approaches, SBDB orbits, ISS, and Sentry briefing in one Mission Control shell.",
   location: "City, Country",
   openToWork: true,
   email: "you@example.com",
   resumeUrl: "#",
   social: {
-    github: "https://github.com/",
+    github: "https://github.com/Parva9eh/orbit-portfolio",
     linkedin: "https://linkedin.com/in/",
   },
-  skills: ["React", "Three.js / R3F", "Node", "Express", "Tailwind", "Vite", "TypeScript"],
+  skills: [
+    "React",
+    "TypeScript",
+    "Three.js / R3F",
+    "Node / Express",
+    "Tailwind",
+    "Vite",
+    "API design",
+  ],
   projects: [
     {
-      id: "astro-explorer",
-      title: "Astro Explorer",
+      id: "orbit",
+      title: "ORBIT — NEO Mission Control",
       blurb:
-        "Interactive 3D near-Earth object visualizer with React Three Fiber, Express caching, and hazard filters — powered by NASA NEO data.",
-      stack: ["React", "TypeScript", "R3F", "Express", "NASA API"],
+        "Interactive 3D near-Earth object explorer: paginated NeoWs catalog, JPL SBDB orbits, compare A/B, schematic ISS LEO, educational Sentry briefing, distance ruler, and guided tours — Express proxy with cache + mock fallback.",
+      stack: ["React", "TypeScript", "R3F", "Express", "NASA / CNEOS"],
       featured: true,
       live: true,
       href: null,
-      repo: null,
+      repo: "https://github.com/Parva9eh/orbit-portfolio",
     },
     {
       id: "project-two",
       title: "Project Two",
-      blurb: "One-line blurb for another project you want to highlight.",
+      blurb: "Replace with another shipped project — one line on problem + outcome.",
       stack: ["Stack", "Tags"],
       featured: false,
       live: false,
@@ -82,7 +90,7 @@ export const site: SiteContent = {
     {
       id: "project-three",
       title: "Project Three",
-      blurb: "Another project card — replace with real work when ready.",
+      blurb: "Replace with a third card when ready (or remove from the list).",
       stack: ["Stack", "Tags"],
       featured: false,
       live: false,
