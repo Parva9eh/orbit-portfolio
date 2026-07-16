@@ -27,6 +27,28 @@ The UI is a full-viewport **Mission Control** shell: 3D canvas + left mission do
 
 ---
 
+## Demo walkthrough (portfolio / interview)
+
+~2 minutes with both servers running (`localhost:5173`):
+
+1. **Briefing → Projects → Enter live system** (left dock).
+2. Open **Guided tours** on the right → **Closest today** (selects nearest NEO).
+3. **+ Compare** a second NEO; note tinted orbits.
+4. **Show ISS** → **Focus ISS** (Earth LEO framing).
+5. Optional: **Sentry watchlist** → pick a designation (educational briefing).
+6. **Copy link** and reopen the URL — state restores.
+
+Deep links:
+
+```
+http://localhost:5173/?mode=live
+http://localhost:5173/?mode=live&view=nearEarth&issFocus=1
+```
+
+Fill personal copy in `client/src/content/site.ts` (name, email, LinkedIn, resume).
+
+---
+
 ## Architecture
 
 ```
@@ -34,7 +56,8 @@ astro-app/
 ├── client/          React 19 + Vite + R3F/Three.js (Mission Control UI + scene)
 ├── server/          Express 5 API — NASA/CNEOS/ISS proxy, cache, mock fallback
 ├── shared/          Domain types + pure helpers (orbit math, format, SBDB merge)
-└── scripts/         Repo hygiene + secret scan
+├── scripts/         Hygiene + smoke checks
+└── docs/            Local notes (gitignored): Live QA, PR checklist, plans
 ```
 
 ### Data flow
@@ -54,7 +77,7 @@ astro-app/
 | `GET` | `/api/iss` | Current ISS lat/lon/alt |
 | `GET` | `/api/sentry` | Sentry watchlist (with offline fallback sample) |
 | `GET` | `/api/sentry/:des` | Sentry object detail |
-| `GET` | `/api/solar` | DONKI flare / GST badge (needs NASA key) |
+| `GET` | `/api/donki/solar` | DONKI flare / GST badge (needs NASA key) |
 | `GET` | `/health` | Liveness (no NASA dependency) |
 
 ---
@@ -84,7 +107,7 @@ astro-app/
 ```bash
 cd server
 cp .env.example .env
-# Edit .env → set NASA_API_KEY=your_key
+# Edit .env → set NASA_API_KEY=your_key  (DEMO_KEY works with limits)
 npm install
 npm run dev
 # → http://localhost:8000  (health: /health)
@@ -99,6 +122,17 @@ npm run dev
 # → http://localhost:5173  (proxies /api → :8000)
 ```
 
+### 3. Smoke + Live QA
+
+```bash
+# From repo root, with both servers running:
+bash scripts/smoke.sh
+
+# Full manual UI pass (local workspace):
+# open docs/LIVE_QA_CHECKLIST.md
+# PR body template: docs/pull_request_template.md
+```
+
 ### Production build (client)
 
 ```bash
@@ -108,6 +142,28 @@ npm run preview
 ```
 
 Point `VITE_API_URL` at your deployed API if the SPA is not served from the same host.
+
+---
+
+## Deploy notes
+
+| Piece | Guidance |
+| --- | --- |
+| **API** | Run `server` on Node 20+ with `NASA_API_KEY`, `PORT`, and production `CORS_ORIGIN` |
+| **SPA** | Static host for `client/dist` (Netlify, Vercel, S3, nginx…) |
+| **Same origin** | Proxy `/api` and `/health` to the Express app; leave `VITE_API_URL` unset so the client uses `/api` |
+| **Split origin** | Set `VITE_API_URL=https://api.example.com/api` at **build** time; set `CORS_ORIGIN` to the SPA origin |
+| **Health** | Load balancer should hit `GET /health` (no NASA dependency) |
+
+Minimal production env (server):
+
+```bash
+NASA_API_KEY=your_key
+PORT=8000
+HOST=0.0.0.0
+NODE_ENV=production
+CORS_ORIGIN=https://your-spa.example
+```
 
 ---
 
@@ -150,10 +206,11 @@ Before a public deploy:
 1. Set a real `NASA_API_KEY` and rotate if it was ever shared.
 2. Set `CORS_ORIGIN` to your SPA origin(s).
 3. Serve the SPA over HTTPS and put the API behind a reverse proxy if needed.
-4. Re-run `bash scripts/hygiene-check.sh`.
+4. Re-run hygiene + smoke:
 
 ```bash
 bash scripts/hygiene-check.sh
+bash scripts/smoke.sh   # against the target stack if reachable
 ```
 
 ---
@@ -168,22 +225,38 @@ bash scripts/hygiene-check.sh
 | `server` | `npm run dev` | `tsx watch` API |
 | `server` | `npm run typecheck` | `tsc --noEmit` |
 | root | `bash scripts/hygiene-check.sh` | Ignore rules + secret scan |
+| root | `bash scripts/smoke.sh` | API + Vite module smoke (servers up) |
+
+**PR checklist (local):** `docs/pull_request_template.md` · **Live QA:** `docs/LIVE_QA_CHECKLIST.md`  
+*(both live under `docs/`, which is gitignored — keep them in your private workspace)*
+
+### Short Live QA (also in README for public repos)
+
+For PRs that touch scene, mission model, Live Neo, or data hooks:
+
+- [ ] Live list loads + select NEO (SBDB soft path OK)
+- [ ] Compare A/B orbits
+- [ ] ISS show + focus
+- [ ] Sentry pick (educational briefing, no raw 502)
+- [ ] Ruler or guided tour
+- [ ] Copy link / deep-link restore (if URL state touched)
 
 ---
 
 ## Design notes (portfolio)
 
-- **Near-Earth view** is the honest scale for NeoWs miss distances; System view is for planets.
-- Orbits use **Line2**-style thin paths and selection highlighting without EffectComposer black-square artifacts.
+- **Near-Earth view** is the honest scale for NeoWs miss distances; System view is for planets and SBDB heliocentric orbits.
+- Orbits use thin paths and selection highlighting without EffectComposer black-square artifacts.
 - Live Neo panel uses a **sticky pagination footer** and a **desktop right rail** shared with viz controls so chrome does not cover the 3D scene.
 - Sentry is labeled as **educational** — degraded mode serves a static sample if CNEOS is down.
+- Mission copy and project cards live in **`client/src/content/site.ts`** only (no hard-coded bio in the 3D layer).
 
 ---
 
 ## License & attribution
 
 - Code: project author’s portfolio work (add a license file if you open-source).
-- Planetary textures under `client/public/textures/` may include third-party assets — see any `ATTRIBUTION.md` next to texture packs.
+- Planetary textures: Solar System Scope (CC BY 4.0) — see `client/public/textures/sss/` notes.
 - Data: NASA NeoWs, JPL SBDB / CNEOS Sentry, DONKI, Where The ISS At — use per their respective terms.
 
 ---

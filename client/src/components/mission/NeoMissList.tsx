@@ -84,9 +84,15 @@ export default function NeoMissList({
             </li>
           );
         })}
+        {loading && asteroids.length === 0 && (
+          <li className="text-xs text-amber-300/80 px-1 animate-pulse">
+            Receiving NEO catalog…
+          </li>
+        )}
         {!loading && asteroids.length === 0 && (
-          <li className="text-xs text-gray-500 px-1">
-            No approaches for this day (or page).
+          <li className="text-xs text-gray-500 px-1 leading-snug">
+            No approaches for this day or filter set. Try another date, clear
+            miss/size filters, or turn off Hazardous only.
           </li>
         )}
       </ul>

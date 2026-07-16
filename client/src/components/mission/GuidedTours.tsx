@@ -71,6 +71,9 @@ export default function GuidedTours({
       >
         <h5 className="text-[10px] uppercase tracking-widest text-cyan-300/95 font-semibold">
           Guided tours
+          <span className="ml-1.5 normal-case tracking-normal font-normal text-cyan-500/70">
+            · demo path
+          </span>
         </h5>
         <span className="text-[10px] text-cyan-400/80 tabular-nums">
           {collapsed ? `${TOURS.length} · Show` : "Hide"}
@@ -79,6 +82,9 @@ export default function GuidedTours({
 
       {!collapsed && (
         <ul className="space-y-1 px-2 pb-2">
+          <li className="text-[10px] text-gray-500 px-1 pb-0.5 leading-snug">
+            Portfolio walkthrough: Closest → Earth → ISS → System
+          </li>
           {TOURS.map((t) => (
             <li key={t.id}>
               <button
