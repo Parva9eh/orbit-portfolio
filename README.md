@@ -154,48 +154,58 @@ Set `VITE_API_URL` at build time if the SPA is not served from the same host as 
 
 ## Deploy
 
-Full Live NEO (catalog, SBDB, ISS, Sentry, solar) needs both:
+**Preferred stack** for full Live NEO + contact form:
 
-1. **SPA** — static files from `client/dist`
-2. **API** — always-on Node process running `server` (Express + cache + NASA/CNEOS proxies)
+| Piece | Host |
+| --- | --- |
+| Domain DNS | **GoDaddy** (domain can stay here) |
+| SPA | **Vercel** (`vercel.json` → `client/dist`) |
+| API | **Render** Web Service (`server`) |
+| Contact form | **Web3Forms** → optional `you@yourdomain.com` |
+| Inbox (optional) | Microsoft 365 from GoDaddy (or any mailbox) |
 
-The **contact form** does not need your API: it posts to Web3Forms from the browser. Set `VITE_WEB3FORMS_ACCESS_KEY` on the SPA build only.
-
-### Recommended: Vercel (SPA) + Railway or Render (API)
-
-This is the lowest-friction path for the full product.
-
-| Piece | Host | Why |
-| --- | --- | --- |
-| UI | **Vercel** | Static Vite build, HTTPS, previews (`vercel.json` at repo root) |
-| API | **Railway** or **Render** (or Fly.io) | Long-running Node, multi-second upstream calls, in-memory cache works |
-
-**API env** (Railway / Render / similar):
-
-```bash
-NASA_API_KEY=your_key
-PORT=8000
-HOST=0.0.0.0
-NODE_ENV=production
-CORS_ORIGIN=https://your-app.vercel.app
+```
+you@domain  ←── Web3Forms
+Browser → Vercel (SPA) ──VITE_API_URL──→ Render /api
+              └── form──→ Web3Forms
 ```
 
-Start: `cd server && npm install && npm run start` (or platform start command with `tsx` / a build step).
+### 1. Render (API)
 
-**Vercel (SPA) env** (build-time):
+- Web Service from this repo; root directory **`server`**
+- Build: `npm install` · Start: `npm run start` (Node 20)
+- Env: `NASA_API_KEY`, `NODE_ENV=production`, `HOST=0.0.0.0`,  
+  `CORS_ORIGIN=https://yourdomain.com,https://www.yourdomain.com`  
+  (Render injects `PORT` — the server already reads it)
+- Check: `https://YOUR-SERVICE.onrender.com/health`
 
-| Variable | Purpose |
+Optional blueprint: `render.yaml` at the repo root.
+
+### 2. Web3Forms (Comms)
+
+- Access key at web3forms.com; set delivery email to `you@yourdomain.com` (not in client source)
+- Pass key to Vercel as `VITE_WEB3FORMS_ACCESS_KEY`
+
+### 3. Vercel (SPA)
+
+- Import repo; production env then **redeploy**:
+
+| Variable | Example |
 | --- | --- |
-| `VITE_API_URL` | Absolute API base ending in `/api`, e.g. `https://orbit-api.up.railway.app/api` |
-| `VITE_WEB3FORMS_ACCESS_KEY` | Comms form (Web3Forms) |
+| `VITE_API_URL` | `https://YOUR-SERVICE.onrender.com/api` |
+| `VITE_WEB3FORMS_ACCESS_KEY` | (from Web3Forms) |
 
-### Same-origin (one domain)
+Never put `NASA_API_KEY` on Vercel.
 
-Put nginx, Caddy, or a PaaS reverse proxy in front: serve `client/dist`, proxy `/api` and `/health` to Express, leave `VITE_API_URL` unset so the client uses relative `/api`. Contact form env still goes on the SPA build.
+### 4. GoDaddy DNS
 
-### Single always-on host (no Vercel)
+In Vercel → Domains, add your domain and **copy the A/CNAME records Vercel shows** into GoDaddy DNS. Keep **MX** records if you use GoDaddy/M365 email. Prefer one canonical host (apex or `www`) and redirect the other.
 
-Run API + serve the built SPA from the same Node/nginx box (Docker, VPS, or Railway with static + API). Slightly more setup, one billable service.
+### 5. Verify
+
+Live list loads · Comms test message arrives · no NASA key or personal email in the client bundle.
+
+**Notes:** Render free tier may sleep (slow first request). Use 2FA on GoDaddy, Vercel, Render, GitHub, and Web3Forms.
 
 ---
 

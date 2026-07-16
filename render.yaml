@@ -1,0 +1,24 @@
+# Render Blueprint — ORBIT API (Express)
+# https://render.com/docs/blueprint-spec
+#
+# In the Render dashboard: New → Blueprint → connect this repo.
+# Set NASA_API_KEY (and CORS_ORIGIN after you know the Vercel URL) in the dashboard.
+
+services:
+  - type: web
+    name: orbit-api
+    runtime: node
+    rootDir: server
+    plan: free
+    buildCommand: npm install
+    startCommand: npm run start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      - key: NASA_API_KEY
+        sync: false
+      - key: CORS_ORIGIN
+        sync: false
