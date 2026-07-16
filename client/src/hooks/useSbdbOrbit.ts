@@ -1,109 +1,65 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo } from "react";
 import type { Asteroid, SbdbOrbitResult } from "@shared";
 import { designationForSbdb } from "@shared";
-import axios from "axios";
-import { getApiBaseUrl } from "../lib/apiBase";
+import { useApiResource } from "./useApiResource";
 
 /** Client memory of successful SBDB results (session). */
 const SBDB_MEM = new Map<string, SbdbOrbitResult>();
-const SBDB_INFLIGHT = new Map<string, Promise<SbdbOrbitResult>>();
 
 /**
  * P3 — fetch JPL SBDB elements for the selected NEO (one call per designation).
  * Server caches 24h; client mem avoids repeat while switching selections.
+ * Uses shared useApiResource GET primitive.
  */
 export function useSbdbOrbit(asteroid: Asteroid | null): {
   sbdb: SbdbOrbitResult | null;
   loading: boolean;
   error: Error | null;
 } {
-  const [sbdb, setSbdb] = useState<SbdbOrbitResult | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
-  const reqId = useRef(0);
+  const sstr = useMemo(() => {
+    if (!asteroid) return null;
+    if (asteroid.orbitSource === "sbdb") return null;
+    return (
+      designationForSbdb({
+        designation: asteroid.designation,
+        name: asteroid.name ?? "",
+      }) || null
+    );
+  }, [
+    asteroid?.id,
+    asteroid?.designation,
+    asteroid?.name,
+    asteroid?.orbitSource,
+  ]);
 
-  const asteroidId = asteroid?.id;
-  const designation = asteroid?.designation;
-  const name = asteroid?.name;
-  const orbitSource = asteroid?.orbitSource;
+  const cacheKey = sstr?.toLowerCase() ?? "";
+
+  // Stable seed per designation — re-read mem only when sstr changes (not after write).
+  const seed = useMemo(
+    () => (cacheKey ? SBDB_MEM.get(cacheKey) ?? null : null),
+    [cacheKey]
+  );
+
+  const { data, loading, error } = useApiResource<SbdbOrbitResult>({
+    path: "/sbdb",
+    enabled: Boolean(sstr),
+    params: sstr ? { sstr } : undefined,
+    timeoutMs: 12_000,
+    initialData: seed,
+    keepOnDisable: false,
+  });
 
   useEffect(() => {
-    if (!asteroidId) {
-      setSbdb(null);
-      setLoading(false);
-      setError(null);
-      return;
+    if (data?.found && cacheKey) {
+      SBDB_MEM.set(cacheKey, data);
     }
+  }, [data, cacheKey]);
 
-    if (orbitSource === "sbdb") {
-      setSbdb(null);
-      setLoading(false);
-      setError(null);
-      return;
-    }
+  const sbdb = data ?? seed;
 
-    const sstr = designationForSbdb({
-      designation,
-      name: name ?? "",
-    });
-    if (!sstr) {
-      setSbdb(null);
-      setLoading(false);
-      return;
-    }
-
-    const key = sstr.toLowerCase();
-    const cached = SBDB_MEM.get(key);
-    if (cached) {
-      setSbdb(cached);
-      setLoading(false);
-      setError(null);
-      return;
-    }
-
-    let cancelled = false;
-    const id = ++reqId.current;
-    setLoading(true);
-    setError(null);
-    setSbdb(null);
-
-    const run = async () => {
-      try {
-        let pending = SBDB_INFLIGHT.get(key);
-        if (!pending) {
-          pending = axios
-            .get<SbdbOrbitResult>(`${getApiBaseUrl()}/sbdb`, {
-              params: { sstr },
-              timeout: 12_000,
-            })
-            .then((res) => res.data)
-            .finally(() => {
-              SBDB_INFLIGHT.delete(key);
-            });
-          SBDB_INFLIGHT.set(key, pending);
-        }
-
-        const result = await pending;
-        if (cancelled || id !== reqId.current) return;
-
-        if (result?.found) {
-          SBDB_MEM.set(key, result);
-        }
-        setSbdb(result ?? null);
-      } catch (err) {
-        if (cancelled || id !== reqId.current) return;
-        setError(err instanceof Error ? err : new Error(String(err)));
-        setSbdb(null);
-      } finally {
-        if (!cancelled && id === reqId.current) setLoading(false);
-      }
-    };
-
-    void run();
-    return () => {
-      cancelled = true;
-    };
-  }, [asteroidId, designation, name, orbitSource]);
-
-  return { sbdb, loading, error };
+  return {
+    sbdb,
+    loading: Boolean(sstr) && loading && !seed && !data,
+    error,
+  };
 }
