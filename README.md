@@ -45,7 +45,7 @@ http://localhost:5173/?mode=live
 http://localhost:5173/?mode=live&view=nearEarth&issFocus=1
 ```
 
-Portfolio identity (name, LinkedIn, resume, projects) lives in `client/src/content/site.ts`.
+Portfolio identity (name, GitHub, resume, projects) lives in `client/src/content/site.ts`.
 
 **Comms** uses a **contact form** (Web3Forms), not a public email address. Create a free key at [web3forms.com](https://web3forms.com), set your inbox there, then:
 
@@ -54,7 +54,7 @@ Portfolio identity (name, LinkedIn, resume, projects) lives in `client/src/conte
 VITE_WEB3FORMS_ACCESS_KEY=your_access_key
 ```
 
-Without the key, Comms still works via GitHub / LinkedIn; the form shows as offline.
+Without the key, Comms still offers GitHub; the form shows as offline until configured.
 
 ---
 
