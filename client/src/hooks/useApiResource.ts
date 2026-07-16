@@ -71,9 +71,8 @@ export function useApiResource<T>(opts: UseApiResourceOptions<T>): {
       return;
     }
 
-    if (initialData != null) {
-      setData((prev) => prev ?? initialData);
-    }
+    // Seed for this path/params key so consumers never briefly see a prior resource.
+    setData(initialData);
 
     void fetchOnce();
 
