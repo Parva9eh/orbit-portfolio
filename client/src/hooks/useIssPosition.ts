@@ -20,8 +20,9 @@ export function useIssPosition(enabled: boolean): {
   const { data, loading, error } = useApiResource<IssPosition>({
     path: "/iss",
     enabled,
-    pollMs: 10_000,
-    timeoutMs: 8_000,
+    pollMs: 12_000,
+    // Server may wait on slow Where The ISS At (~10–18s) + enrichments
+    timeoutMs: 28_000,
     initialData: seed,
   });
   return { iss: data, loading, error };

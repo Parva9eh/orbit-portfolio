@@ -53,6 +53,13 @@ export default function IssBriefing({ iss }: IssBriefingProps) {
         </span>
       </div>
 
+      {iss.source === "open-notify" && (
+        <p className="text-[10px] text-amber-200/85 leading-snug border border-amber-500/20 rounded px-1.5 py-1 bg-amber-950/20">
+          Sparse fallback (Open Notify) — lat/lon only. Rich fields need Where
+          The ISS At; retry in a few seconds if the primary feed was slow.
+        </p>
+      )}
+
       <dl className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5 text-[11px] text-gray-300">
         <dt className="text-gray-500">Lat / lon</dt>
         <dd className="text-right tabular-nums text-sky-100/90">
@@ -60,7 +67,11 @@ export default function IssBriefing({ iss }: IssBriefingProps) {
         </dd>
         <dt className="text-gray-500">Altitude</dt>
         <dd className="text-right tabular-nums">
-          {iss.altKm != null ? `${Math.round(iss.altKm)} km` : "—"}
+          {iss.altKm != null
+            ? `${Math.round(iss.altKm)} km`
+            : iss.source === "open-notify"
+              ? "~420 km typical"
+              : "—"}
         </dd>
         <dt className="text-gray-500">Velocity</dt>
         <dd className="text-right tabular-nums text-[10px]">
@@ -79,7 +90,10 @@ export default function IssBriefing({ iss }: IssBriefingProps) {
         {groundBits.length > 0 && (
           <>
             <dt className="text-gray-500">Ground</dt>
-            <dd className="text-right text-[10px] text-gray-400 truncate" title={groundBits.join(" · ")}>
+            <dd
+              className="text-right text-[10px] text-gray-400 truncate"
+              title={groundBits.join(" · ")}
+            >
               {groundBits.join(" · ")}
             </dd>
           </>
@@ -97,7 +111,7 @@ export default function IssBriefing({ iss }: IssBriefingProps) {
           <>
             <dt className="text-gray-500">Trail</dt>
             <dd className="text-right tabular-nums text-gray-400">
-              {iss.trail.length} pts · ~{Math.round((iss.trail.length * 2))} min
+              {iss.trail.length} pts · ~{Math.round(iss.trail.length * 2)} min
             </dd>
           </>
         )}
