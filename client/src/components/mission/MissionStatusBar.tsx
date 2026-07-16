@@ -83,6 +83,13 @@ export default function MissionStatusBar({
               <span className="ml-1.5 text-red-300/90 font-semibold">PHA</span>
             )}
           </p>
+        ) : showIss && iss && iss.source === "mock" ? (
+          <p className="truncate text-center text-amber-200/80 tracking-wide animate-pulse">
+            <span className="text-gray-500 font-normal">
+              {issFocus ? "ISS focus · " : "ISS · "}
+            </span>
+            Acquiring live telemetry…
+          </p>
         ) : showIss && iss ? (
           <p
             className="truncate text-center text-sky-300/90 tabular-nums tracking-wide"
