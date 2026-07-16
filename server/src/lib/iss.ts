@@ -17,11 +17,18 @@ import {
 const WTIA = "https://api.wheretheiss.at/v1";
 const ISS_NORAD = 25544;
 const TLE_TTL_SEC = 3600;
-const TRAIL_POINTS = 10;
-/** Seconds between trail samples (~2 min × 10 ≈ 20 min arc) */
+const TRAIL_TTL_SEC = 90;
+const GROUND_TTL_SEC = 60;
+/** Fewer points = faster /positions call on a slow upstream */
+const TRAIL_POINTS = 5;
+/** Seconds between trail samples (~2 min × 5 ≈ 10 min arc) */
 const TRAIL_STEP_SEC = 120;
-/** Sparse fallback — cache briefly so we retry WTIA soon */
 const OPEN_NOTIFY_TTL_SEC = 6;
+
+const CACHE_CORE = "iss_now_v2";
+const CACHE_TLE = "iss_tle";
+const CACHE_TRAIL = "iss_trail";
+const CACHE_GROUND = "iss_ground";
 
 type WtiaSatellite = {
   name?: string;
@@ -70,88 +77,6 @@ function parseTleInclinationDeg(line2: string | undefined): number | null {
   return Number.isFinite(i) ? i : null;
 }
 
-async function fetchTle(): Promise<IssTle | null> {
-  const key = "iss_tle";
-  const hit = cache.get<IssTle>(key);
-  if (hit) return hit;
-  try {
-    const r = await axios.get<WtiaTles>(`${WTIA}/satellites/${ISS_NORAD}/tles`, {
-      timeout: ISS_ENRICH_TIMEOUT_MS,
-    });
-    const d = r.data;
-    if (!d.line1 || !d.line2) return null;
-    const tle: IssTle = {
-      header: d.header ?? d.name ?? "ISS (ZARYA)",
-      line1: d.line1,
-      line2: d.line2,
-      inclinationDeg: parseTleInclinationDeg(d.line2),
-      tleTimestampMs:
-        d.tle_timestamp != null ? Number(d.tle_timestamp) * 1000 : null,
-    };
-    cache.set(key, tle, TLE_TTL_SEC);
-    return tle;
-  } catch (e) {
-    console.warn(
-      "[iss] TLE enrich failed:",
-      e instanceof Error ? e.message : e
-    );
-    return null;
-  }
-}
-
-async function fetchGround(
-  lat: number,
-  lon: number
-): Promise<IssGroundContext | null> {
-  try {
-    const r = await axios.get<WtiaCoords>(
-      `${WTIA}/coordinates/${lat},${lon}`,
-      { timeout: ISS_ENRICH_TIMEOUT_MS }
-    );
-    const d = r.data;
-    return {
-      timezoneId: d.timezone_id ?? null,
-      offsetHours:
-        d.offset != null && Number.isFinite(d.offset) ? d.offset : null,
-      countryCode: d.country_code ?? null,
-    };
-  } catch {
-    return null;
-  }
-}
-
-async function fetchTrail(nowSec: number): Promise<IssTrailSample[]> {
-  const stamps: number[] = [];
-  for (let i = TRAIL_POINTS - 1; i >= 0; i--) {
-    stamps.push(nowSec - i * TRAIL_STEP_SEC);
-  }
-  try {
-    const r = await axios.get<WtiaSatellite[]>(
-      `${WTIA}/satellites/${ISS_NORAD}/positions`,
-      {
-        params: { timestamps: stamps.join(",") },
-        timeout: ISS_ENRICH_TIMEOUT_MS,
-      }
-    );
-    const list = Array.isArray(r.data) ? r.data : [];
-    return list
-      .map((d) => ({
-        lat: Number(d.latitude),
-        lon: Number(d.longitude),
-        altKm: d.altitude != null ? Number(d.altitude) : null,
-        timestampMs:
-          d.timestamp != null ? Number(d.timestamp) * 1000 : Date.now(),
-      }))
-      .filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lon));
-  } catch (e) {
-    console.warn(
-      "[iss] trail enrich failed:",
-      e instanceof Error ? e.message : e
-    );
-    return [];
-  }
-}
-
 function emptyExtras(): Pick<
   IssPosition,
   | "visibility"
@@ -173,21 +98,140 @@ function emptyExtras(): Pick<
   };
 }
 
+function readCachedExtras(): Pick<
+  IssPosition,
+  "ground" | "trail" | "tle"
+> {
+  return {
+    ground: cache.get<IssGroundContext>(CACHE_GROUND) ?? null,
+    trail: cache.get<IssTrailSample[]>(CACHE_TRAIL) ?? [],
+    tle: cache.get<IssTle>(CACHE_TLE) ?? null,
+  };
+}
+
+async function fetchTleIntoCache(): Promise<void> {
+  if (cache.get<IssTle>(CACHE_TLE)) return;
+  try {
+    const r = await axios.get<WtiaTles>(
+      `${WTIA}/satellites/${ISS_NORAD}/tles`,
+      { timeout: ISS_ENRICH_TIMEOUT_MS }
+    );
+    const d = r.data;
+    if (!d.line1 || !d.line2) return;
+    const tle: IssTle = {
+      header: d.header ?? d.name ?? "ISS (ZARYA)",
+      line1: d.line1,
+      line2: d.line2,
+      inclinationDeg: parseTleInclinationDeg(d.line2),
+      tleTimestampMs:
+        d.tle_timestamp != null ? Number(d.tle_timestamp) * 1000 : null,
+    };
+    cache.set(CACHE_TLE, tle, TLE_TTL_SEC);
+  } catch (e) {
+    // Quiet after first warn per process window — still log once-ish
+    console.warn(
+      "[iss] TLE enrich failed:",
+      e instanceof Error ? e.message : e
+    );
+  }
+}
+
+async function fetchGroundIntoCache(lat: number, lon: number): Promise<void> {
+  const gKey = `${CACHE_GROUND}:${lat.toFixed(1)},${lon.toFixed(1)}`;
+  if (cache.get<IssGroundContext>(gKey)) {
+    cache.set(CACHE_GROUND, cache.get<IssGroundContext>(gKey)!, GROUND_TTL_SEC);
+    return;
+  }
+  try {
+    const r = await axios.get<WtiaCoords>(
+      `${WTIA}/coordinates/${lat},${lon}`,
+      { timeout: ISS_ENRICH_TIMEOUT_MS }
+    );
+    const d = r.data;
+    const ground: IssGroundContext = {
+      timezoneId: d.timezone_id ?? null,
+      offsetHours:
+        d.offset != null && Number.isFinite(d.offset) ? d.offset : null,
+      countryCode: d.country_code ?? null,
+    };
+    cache.set(gKey, ground, GROUND_TTL_SEC);
+    cache.set(CACHE_GROUND, ground, GROUND_TTL_SEC);
+  } catch {
+    /* soft */
+  }
+}
+
+async function fetchTrailIntoCache(nowSec: number): Promise<void> {
+  if (cache.get<IssTrailSample[]>(CACHE_TRAIL)) return;
+  const stamps: number[] = [];
+  for (let i = TRAIL_POINTS - 1; i >= 0; i--) {
+    stamps.push(nowSec - i * TRAIL_STEP_SEC);
+  }
+  try {
+    const r = await axios.get<WtiaSatellite[]>(
+      `${WTIA}/satellites/${ISS_NORAD}/positions`,
+      {
+        params: { timestamps: stamps.join(",") },
+        timeout: ISS_ENRICH_TIMEOUT_MS,
+      }
+    );
+    const list = Array.isArray(r.data) ? r.data : [];
+    const trail = list
+      .map((d) => ({
+        lat: Number(d.latitude),
+        lon: Number(d.longitude),
+        altKm: d.altitude != null ? Number(d.altitude) : null,
+        timestampMs:
+          d.timestamp != null ? Number(d.timestamp) * 1000 : Date.now(),
+      }))
+      .filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lon));
+    if (trail.length) cache.set(CACHE_TRAIL, trail, TRAIL_TTL_SEC);
+  } catch (e) {
+    console.warn(
+      "[iss] trail enrich failed:",
+      e instanceof Error ? e.message : e
+    );
+  }
+}
+
+/** Background only — never awaited on the request critical path. */
+function scheduleEnrichments(lat: number, lon: number, nowSec: number): void {
+  void Promise.allSettled([
+    fetchGroundIntoCache(lat, lon),
+    fetchTrailIntoCache(nowSec),
+    fetchTleIntoCache(),
+  ]);
+}
+
 /**
- * Core position first (Where The ISS At), then best-effort enrichments.
- * Falls back to Open Notify lat/lon only when WTIA is unreachable.
+ * Core position first (Where The ISS At). Trail / TLE / ground load in the
+ * background into cache and appear on the next poll (~12s) so a slow WTIA
+ * enrich path never blocks alt/vel/visibility.
  */
 export async function fetchIssPosition(): Promise<IssPosition> {
-  const key = "iss_now_v2";
-  const hit = cache.get<IssPosition>(key);
-  if (hit) return hit;
+  const hit = cache.get<IssPosition>(CACHE_CORE);
+  if (hit) {
+    // Refresh enrichments opportunistically while serving hot cache
+    if (hit.source === "wheretheiss.at") {
+      scheduleEnrichments(
+        hit.lat,
+        hit.lon,
+        Math.floor(hit.timestampMs / 1000) || Math.floor(Date.now() / 1000)
+      );
+      // Merge latest enrichments into a shallow copy for this response
+      const extras = readCachedExtras();
+      return { ...hit, ...extras };
+    }
+    return hit;
+  }
 
-  const pending = inflightIss.get(key) as Promise<IssPosition> | undefined;
+  const pending = inflightIss.get(CACHE_CORE) as
+    | Promise<IssPosition>
+    | undefined;
   if (pending) return pending;
 
   const load = (async (): Promise<IssPosition> => {
     try {
-      // 1) Primary — rich telemetry (often slow; timeout must be generous)
       try {
         const r = await axios.get<WtiaSatellite>(
           `${WTIA}/satellites/${ISS_NORAD}`,
@@ -211,18 +255,14 @@ export async function fetchIssPosition(): Promise<IssPosition> {
             ? Number(d.timestamp)
             : Math.floor(Date.now() / 1000);
 
-        // 2) Enrich in parallel — each fails soft; don't discard core telemetry
-        const [ground, trail, tle] = await Promise.all([
-          fetchGround(lat, lon),
-          fetchTrail(nowSec),
-          fetchTle(),
-        ]);
+        // Kick enrichments — do not await (upstream is often >10s each)
+        scheduleEnrichments(lat, lon, nowSec);
 
+        const extras = readCachedExtras();
         const pos: IssPosition = {
           lat,
           lon,
           altKm: d.altitude != null ? Number(d.altitude) : null,
-          // API velocity is km/h when units=kilometers
           velocityKmS:
             d.velocity != null ? Number(d.velocity) / 3600 : null,
           timestampMs,
@@ -231,11 +271,9 @@ export async function fetchIssPosition(): Promise<IssPosition> {
           footprintKm: d.footprint != null ? Number(d.footprint) : null,
           solarLat: d.solar_lat != null ? Number(d.solar_lat) : null,
           solarLon: d.solar_lon != null ? Number(d.solar_lon) : null,
-          ground,
-          trail,
-          tle,
+          ...extras,
         };
-        cache.set(key, pos, ISS_TTL_SEC);
+        cache.set(CACHE_CORE, pos, ISS_TTL_SEC);
         return pos;
       } catch (e) {
         console.warn(
@@ -244,7 +282,6 @@ export async function fetchIssPosition(): Promise<IssPosition> {
         );
       }
 
-      // 3) Open Notify — lat/lon only (no alt/vel/visibility)
       const r2 = await axios.get<{
         iss_position?: { latitude?: string; longitude?: string };
         timestamp?: number;
@@ -259,7 +296,6 @@ export async function fetchIssPosition(): Promise<IssPosition> {
       const pos: IssPosition = {
         lat,
         lon,
-        // Do not pretend we measured altitude
         altKm: null,
         velocityKmS: null,
         timestampMs:
@@ -269,13 +305,13 @@ export async function fetchIssPosition(): Promise<IssPosition> {
         source: "open-notify",
         ...emptyExtras(),
       };
-      cache.set(key, pos, OPEN_NOTIFY_TTL_SEC);
+      cache.set(CACHE_CORE, pos, OPEN_NOTIFY_TTL_SEC);
       return pos;
     } finally {
-      inflightIss.delete(key);
+      inflightIss.delete(CACHE_CORE);
     }
   })();
 
-  inflightIss.set(key, load);
+  inflightIss.set(CACHE_CORE, load);
   return load;
 }

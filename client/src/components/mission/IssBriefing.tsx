@@ -107,11 +107,26 @@ export default function IssBriefing({ iss }: IssBriefingProps) {
             </dd>
           </>
         )}
-        {iss.trail.length > 0 && (
+        {iss.trail.length > 0 ? (
           <>
             <dt className="text-gray-500">Trail</dt>
             <dd className="text-right tabular-nums text-gray-400">
               {iss.trail.length} pts · ~{Math.round(iss.trail.length * 2)} min
+            </dd>
+          </>
+        ) : iss.source === "wheretheiss.at" ? (
+          <>
+            <dt className="text-gray-500">Trail</dt>
+            <dd className="text-right text-[10px] text-gray-600">
+              loading next poll…
+            </dd>
+          </>
+        ) : null}
+        {!iss.tle && iss.source === "wheretheiss.at" && (
+          <>
+            <dt className="text-gray-500">TLE</dt>
+            <dd className="text-right text-[10px] text-gray-600">
+              loading next poll…
             </dd>
           </>
         )}
