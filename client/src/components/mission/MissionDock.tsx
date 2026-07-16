@@ -131,12 +131,15 @@ type MissionDockProps = {
   step: MissionStepId;
   onStepChange: (step: MissionStepId) => void;
   onEnterLive: () => void;
+  /** Phone/tablet landscape: dock sits on the left half so tools can slide from the right */
+  landscape?: boolean;
 };
 
 export default function MissionDock({
   step,
   onStepChange,
   onEnterLive,
+  landscape = false,
 }: MissionDockProps) {
   const meta = MISSION_STEPS.find((s) => s.id === step) ?? MISSION_STEPS[0];
 
@@ -229,12 +232,18 @@ export default function MissionDock({
 
   return (
     <aside
-      className="absolute z-20 flex flex-col overflow-hidden rounded-xl border border-white/10 bg-[#0f1623]/cc backdrop-blur-md shadow-2xl
-        left-3 right-3 bottom-12 max-h-[min(42vh,22rem)]
-        max-md:max-h-[min(38dvh,18rem)]
-        safe-pad-x
-        md:left-4 md:right-auto md:top-16 md:bottom-14 md:w-[min(360px,92vw)] md:max-h-none"
+      className={
+        landscape
+          ? `absolute z-20 flex flex-col overflow-hidden rounded-xl border border-white/10 bg-[#0f1623]/cc backdrop-blur-md shadow-2xl
+              left-2 top-14 bottom-12 w-[min(46vw,22rem)] max-h-none safe-pad-x`
+          : `absolute z-20 flex flex-col overflow-hidden rounded-xl border border-white/10 bg-[#0f1623]/cc backdrop-blur-md shadow-2xl
+              left-3 right-3 bottom-12 max-h-[min(42vh,22rem)]
+              max-md:max-h-[min(38dvh,18rem)]
+              safe-pad-x
+              md:left-4 md:right-auto md:top-16 md:bottom-14 md:w-[min(360px,92vw)] md:max-h-none`
+      }
       aria-live="polite"
+      data-landscape={landscape ? "true" : "false"}
     >
       <div className="px-4 pt-4 pb-3 border-b border-white/10 shrink-0">
         <p className="text-[0.65rem] tracking-[0.14em] uppercase text-cyan-300 font-semibold mb-1">

@@ -113,7 +113,7 @@ export default function LiveNeoPanel({ embedded = false }: LiveNeoPanelProps) {
         md:w-[min(320px,90vw)] md:max-h-none`;
 
   return (
-    <aside className={shellClass} aria-label="Live NEO tools">
+    <aside className={shellClass} aria-label="Live NEO tools" role="complementary">
       <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-3 pb-2">
         <h4 className="text-xs tracking-widest uppercase text-cyan-300 font-semibold mb-2">
           Live NEO tools
