@@ -1,5 +1,34 @@
 /** P5 — free live / watchlist payloads (ISS + CNEOS Sentry). */
 
+/** Daylight vs Earth shadow from Where The ISS At */
+export type IssVisibility = "daylight" | "eclipsed" | "unknown";
+
+export type IssTrailSample = {
+  lat: number;
+  lon: number;
+  altKm: number | null;
+  timestampMs: number;
+};
+
+/** Coarse ground-track context under the station (Where The ISS At /coordinates). */
+export type IssGroundContext = {
+  timezoneId: string | null;
+  /** Hours offset from UTC when known */
+  offsetHours: number | null;
+  countryCode: string | null;
+};
+
+/** ZARYA TLE snapshot for educational LEO elements. */
+export type IssTle = {
+  header: string;
+  line1: string;
+  line2: string;
+  /** Degrees, parsed from line 2 when possible */
+  inclinationDeg: number | null;
+  /** Epoch of the TLE set (ms), when provided */
+  tleTimestampMs: number | null;
+};
+
 export type IssPosition = {
   lat: number;
   lon: number;
@@ -9,6 +38,18 @@ export type IssPosition = {
   /** Unix ms when sample was taken */
   timestampMs: number;
   source: "wheretheiss.at" | "open-notify" | "mock";
+  /** Sunlit vs in Earth's shadow */
+  visibility: IssVisibility;
+  /** Ground visibility footprint radius (km) */
+  footprintKm: number | null;
+  solarLat: number | null;
+  solarLon: number | null;
+  /** Reverse-geocode style context for current lat/lon */
+  ground: IssGroundContext | null;
+  /** Recent path samples (schematic trail), newest last */
+  trail: IssTrailSample[];
+  /** Latest TLE (cached longer server-side) */
+  tle: IssTle | null;
 };
 
 /**
@@ -22,6 +63,13 @@ export const DEFAULT_ISS: IssPosition = {
   velocityKmS: 7.66,
   timestampMs: 0,
   source: "mock",
+  visibility: "unknown",
+  footprintKm: null,
+  solarLat: null,
+  solarLon: null,
+  ground: null,
+  trail: [],
+  tle: null,
 };
 
 export type SentryWatchItem = {

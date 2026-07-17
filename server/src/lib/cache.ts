@@ -6,10 +6,16 @@ export const FULL_TTL_SEC = 3600;
 export const PAGE_TTL_SEC = 300;
 export const SBDB_TTL_SEC = 86_400; // 24h — orbital elements change rarely
 export const SENTRY_TTL_SEC = 6 * 3600; // 6h — risk list changes slowly
-export const ISS_TTL_SEC = 8; // short — live craft
+export const ISS_TTL_SEC = 12; // short — live craft (rich path is slower upstream)
 export const NASA_TIMEOUT_MS = 12_000;
 export const SBDB_TIMEOUT_MS = 10_000;
-export const ISS_TIMEOUT_MS = 6_000;
+/** Where The ISS At primary position is often slow (10–15s) */
+export const ISS_TIMEOUT_MS = 18_000;
+/**
+ * Background enrichments (trail / coords / TLE). Longer budget is OK because
+ * they no longer block the /iss response — they fill cache for the next poll.
+ */
+export const ISS_ENRICH_TIMEOUT_MS = 20_000;
 export const SENTRY_TIMEOUT_MS = 18_000;
 export const MAX_PAGE_LIMIT = 50;
 

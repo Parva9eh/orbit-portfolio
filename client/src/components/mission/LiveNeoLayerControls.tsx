@@ -1,6 +1,7 @@
 import type { Dispatch } from "react";
 import type { IssPosition } from "@shared";
 import type { LiveMissionAction, LiveMissionState } from "../../mission/liveMissionState";
+import IssBriefing from "./IssBriefing";
 
 type LiveNeoLayerControlsProps = {
   live: LiveMissionState;
@@ -10,6 +11,9 @@ type LiveNeoLayerControlsProps = {
   showHazardous: boolean;
   onHazardousChange: (v: boolean) => void;
   iss: IssPosition | null;
+  /** False while only local seed is shown */
+  issLive?: boolean;
+  issAcquiring?: boolean;
   onShowIssChange: (v: boolean) => void;
   onIssFocusChange: (v: boolean) => void;
   onShowSentryChange: (v: boolean) => void;
@@ -26,6 +30,8 @@ export default function LiveNeoLayerControls({
   showHazardous,
   onHazardousChange,
   iss,
+  issLive = false,
+  issAcquiring = false,
   onShowIssChange,
   onIssFocusChange,
   onShowSentryChange,
@@ -127,9 +133,15 @@ export default function LiveNeoLayerControls({
             className="h-4 w-4 accent-sky-400"
           />
           Show ISS
-          {showIss && iss && (
+          {showIss && issAcquiring && (
+            <span className="text-[10px] text-amber-300/90 font-normal animate-pulse">
+              acquiring…
+            </span>
+          )}
+          {showIss && issLive && iss && (
             <span className="text-[10px] text-sky-400/90 tabular-nums font-normal">
               {iss.lat.toFixed(1)}° · {iss.lon.toFixed(1)}°
+              {iss.altKm != null ? ` · ${Math.round(iss.altKm)} km` : ""}
             </span>
           )}
         </label>
@@ -151,6 +163,9 @@ export default function LiveNeoLayerControls({
           <p className="text-[10px] text-sky-400/70 ml-6 leading-snug">
             Tight orbit of Earth · schematic LEO ring · station enlarged
           </p>
+        )}
+        {showIss && iss && (
+          <IssBriefing iss={iss} acquiring={issAcquiring || !issLive} />
         )}
       </div>
 
