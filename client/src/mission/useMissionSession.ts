@@ -106,12 +106,12 @@ export function useMissionSession() {
       if (nextMode === "live") {
         goToStep("live");
         setViewScale("nearEarth");
-        setCameraMode("tour");
+        setCameraMode("free");
       } else {
         setSelectedItem((cur) => (cur && isAsteroid(cur) ? null : cur));
         dispatchLive({ type: "CLEAR_COMPARE" });
         setViewScale("system");
-        setCameraMode("tour");
+        setCameraMode("free");
         if (step === "live") goToStep("briefing");
       }
     },
