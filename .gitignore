@@ -55,3 +55,9 @@ Thumbs.db
 .turbo/
 .vercel/
 .netlify/
+
+# Playwright
+client/test-results/
+client/playwright-report/
+client/blob-report/
+

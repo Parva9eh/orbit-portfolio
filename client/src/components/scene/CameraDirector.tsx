@@ -269,7 +269,8 @@ export default function CameraDirector({
       return;
     }
 
-    if (cameraMode === "tour" || (cameraMode === "focus" && !selectedItem)) {
+    // Tour — cinematic auto-orbit around the system (or Earth in near-Earth handled above)
+    if (cameraMode === "tour") {
       if (controls) controls.enabled = false;
       tourAngle.current += dt * 0.07;
       const r = 72;
@@ -286,6 +287,7 @@ export default function CameraDirector({
       return;
     }
 
+    // Focus — dolly to selection; with no selection, fall through to free
     if (cameraMode === "focus" && selectedItem) {
       if (controls) controls.enabled = false;
       const tracked =
@@ -315,9 +317,9 @@ export default function CameraDirector({
       return;
     }
 
-    // free
+    // Free (default) — user OrbitControls; also used when Focus has no selection
     if (controls) {
-      controls.enabled = true;
+      controls.enabled = !issFocus;
       controls.update();
     }
   });

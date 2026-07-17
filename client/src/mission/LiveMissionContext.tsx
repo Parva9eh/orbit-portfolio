@@ -26,8 +26,12 @@ export type LiveMissionTools = {
   asteroids: Asteroid[];
   catalogAsteroids: Asteroid[];
   closestSummary: string | null;
+  /** Catalog size for the current date/filter (server total, not just this page) */
+  totalItems: number;
   totalPages: number;
   currentPage: number;
+  /** True while requested page data is not yet available */
+  pagePending?: boolean;
   loading: boolean;
 
   sbdb: SbdbOrbitResult | null;

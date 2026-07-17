@@ -18,30 +18,44 @@ export default function MissionTopBar({
   onModeChange,
 }: MissionTopBarProps) {
   return (
-    <header className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between gap-3 px-4 py-3 md:px-5 bg-gradient-to-b from-black/90 to-transparent">
+    <header
+      className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between gap-2 sm:gap-3
+        px-3 py-2.5 sm:px-4 sm:py-3 md:px-5
+        safe-pad-x safe-pad-t
+        bg-gradient-to-b from-black/90 via-black/70 to-transparent"
+    >
       <div className="font-bold tracking-widest text-sm md:text-base shrink-0">
         {brand}
         <span className="text-custom-blue">.</span>
       </div>
 
+      {/* Mobile + desktop: scrollable steps (was hidden on xs — no step nav) */}
       <nav
-        className="hidden sm:flex flex-wrap gap-1 justify-center"
+        className="flex flex-1 min-w-0 max-w-[min(52vw,16rem)] sm:max-w-none
+          gap-1 justify-start sm:justify-center overflow-x-auto scrollbar-none
+          touch-pan-x"
         aria-label="Mission sections"
       >
-        {MISSION_STEPS.map((s) => (
-          <button
-            key={s.id}
-            type="button"
-            onClick={() => onStepChange(s.id)}
-            className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${
-              step === s.id
-                ? "text-white bg-custom-blue/20 border-custom-blue/50"
-                : "text-gray-400 border-transparent hover:text-white"
-            }`}
-          >
-            {s.label}
-          </button>
-        ))}
+        {MISSION_STEPS.map((s) => {
+          const short = s.label.split(" ")[0]; // "01", "02", …
+          return (
+            <button
+              key={s.id}
+              type="button"
+              onClick={() => onStepChange(s.id)}
+              title={s.label}
+              className={`shrink-0 text-[11px] sm:text-xs px-2.5 sm:px-3 py-1.5 rounded-lg border transition-colors tap-target
+                ${
+                  step === s.id
+                    ? "text-white bg-custom-blue/20 border-custom-blue/50"
+                    : "text-gray-400 border-transparent hover:text-white"
+                }`}
+            >
+              <span className="sm:hidden">{short}</span>
+              <span className="hidden sm:inline">{s.label}</span>
+            </button>
+          );
+        })}
       </nav>
 
       <div
@@ -52,7 +66,7 @@ export default function MissionTopBar({
         <button
           type="button"
           onClick={() => onModeChange("story")}
-          className={`text-xs font-semibold px-2.5 py-1 rounded-full transition-colors ${
+          className={`text-[11px] sm:text-xs font-semibold px-2 sm:px-2.5 py-1.5 rounded-full transition-colors tap-target ${
             mode === "story"
               ? "bg-custom-blue text-white"
               : "text-gray-400 hover:text-white"
@@ -63,13 +77,14 @@ export default function MissionTopBar({
         <button
           type="button"
           onClick={() => onModeChange("live")}
-          className={`text-xs font-semibold px-2.5 py-1 rounded-full transition-colors ${
+          className={`text-[11px] sm:text-xs font-semibold px-2 sm:px-2.5 py-1.5 rounded-full transition-colors tap-target ${
             mode === "live"
               ? "bg-custom-blue text-white"
               : "text-gray-400 hover:text-white"
           }`}
         >
-          Live NEO
+          <span className="sm:hidden">Live</span>
+          <span className="hidden sm:inline">Live NEO</span>
         </button>
       </div>
     </header>

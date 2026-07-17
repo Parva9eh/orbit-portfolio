@@ -177,8 +177,12 @@ export function useLiveHandlers(args: LiveHandlersArgs) {
   );
 
   const handlePageChange = useCallback(
-    (next: number) => {
-      dispatchLive({ type: "SET_PAGE", page: Math.max(1, next) });
+    (next: number, totalPages?: number) => {
+      let p = Math.max(1, Math.floor(next) || 1);
+      if (totalPages != null && totalPages > 0) {
+        p = Math.min(p, totalPages);
+      }
+      dispatchLive({ type: "SET_PAGE", page: p });
       setSelectedItem((cur) => (cur && isAsteroid(cur) ? null : cur));
     },
     [dispatchLive, setSelectedItem]

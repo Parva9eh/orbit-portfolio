@@ -16,10 +16,22 @@ const SPEEDS: { value: TimeScalePreset; label: string }[] = [
   { value: 10, label: "10×" },
 ];
 
-const CAMERAS: { value: CameraMode; label: string }[] = [
-  { value: "free", label: "Free" },
-  { value: "tour", label: "Tour" },
-  { value: "focus", label: "Focus" },
+const CAMERAS: { value: CameraMode; label: string; title: string }[] = [
+  {
+    value: "free",
+    label: "Free",
+    title: "Drag to orbit, scroll to zoom (default)",
+  },
+  {
+    value: "tour",
+    label: "Tour",
+    title: "Auto cinematic orbit of the system or Earth neighborhood",
+  },
+  {
+    value: "focus",
+    label: "Focus",
+    title: "Dolly toward the selected body (pick a NEO or planet first)",
+  },
 ];
 
 const QUALITY: { value: QualityPreset; label: string }[] = [
@@ -47,11 +59,14 @@ type VizControlsProps = {
    * bottom-right / bottom-center placement.
    */
   embedded?: boolean;
+  /** Phone layout: denser spacing, secondary controls in a details block */
+  compact?: boolean;
 };
 
 export default function VizControls({
   onScreenshot,
   embedded = false,
+  compact = false,
 }: VizControlsProps) {
   const {
     timeScale,
@@ -101,7 +116,6 @@ export default function VizControls({
     }
   }, [audioEnabled]);
 
-  // Mission clock readout (~4Hz, not every frame in React)
   useEffect(() => {
     const id = window.setInterval(() => {
       setClockLabel(formatSimClock(getSimTime()).label);
@@ -122,100 +136,16 @@ export default function VizControls({
     return () => window.removeEventListener("orbit-sfx-click", handler);
   }, [playClick]);
 
-  return (
-    <div
-      className={
-        embedded
-          ? "relative w-full flex flex-col gap-1.5 p-2 rounded-xl border border-white/10 bg-[#0f1623]/95 backdrop-blur-md text-[0.7rem] text-gray-300 shadow-xl"
-          : "absolute z-30 bottom-12 left-1/2 -translate-x-1/2 md:left-auto md:right-4 md:translate-x-0 md:bottom-14 flex flex-col gap-2 p-2.5 rounded-xl border border-white/10 bg-[#0f1623]/90 backdrop-blur-md text-[0.7rem] text-gray-300 shadow-xl max-w-[min(92vw,300px)]"
-      }
-      role="toolbar"
-      aria-label="Visualization controls"
-    >
-      {/* Mission clock */}
-      <div className="flex items-center justify-between gap-2 px-1">
-        <span className="text-cyan-300/90 uppercase tracking-wider text-[0.62rem]">
-          Mission clock
-        </span>
-        <span className="font-mono text-sky-200/95 text-xs tabular-nums">
-          {clockLabel}
-        </span>
-      </div>
+  const chip = (active: boolean) =>
+    `px-2 py-1.5 rounded-md font-semibold transition-colors tap-target ${
+      active
+        ? "bg-custom-blue text-white"
+        : "bg-black/40 hover:bg-white/10 text-gray-300"
+    }`;
 
-      {/* Time scale */}
-      <div className="flex items-center gap-1">
-        <span className="text-cyan-300/90 uppercase tracking-wider text-[0.62rem] mr-1">
-          Time
-        </span>
-        {SPEEDS.map((s) => (
-          <button
-            key={s.value}
-            type="button"
-            onClick={() => setTimeScale(s.value)}
-            className={`px-2 py-1 rounded-md font-semibold transition-colors ${
-              timeScale === s.value
-                ? "bg-custom-blue text-white"
-                : "bg-black/40 hover:bg-white/10 text-gray-300"
-            }`}
-            title={s.value === 0 ? "Pause" : `${s.value}× speed`}
-          >
-            {s.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Camera director */}
-      <div className="flex items-center gap-1">
-        <span className="text-cyan-300/90 uppercase tracking-wider text-[0.62rem] mr-1">
-          Cam
-        </span>
-        {CAMERAS.map((c) => (
-          <button
-            key={c.value}
-            type="button"
-            onClick={() => setCameraMode(c.value)}
-            className={`px-2 py-1 rounded-md font-semibold transition-colors ${
-              cameraMode === c.value
-                ? "bg-custom-blue text-white"
-                : "bg-black/40 hover:bg-white/10 text-gray-300"
-            }`}
-            title={
-              c.value === "free"
-                ? "Manual orbit controls"
-                : c.value === "tour"
-                  ? "Auto cinematic tour"
-                  : "Dolly to selected body"
-            }
-          >
-            {c.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Multi-scale view */}
-      <div className="flex items-center gap-1">
-        <span className="text-cyan-300/90 uppercase tracking-wider text-[0.62rem] mr-1">
-          View
-        </span>
-        {VIEWS.map((v) => (
-          <button
-            key={v.value}
-            type="button"
-            title={v.title}
-            onClick={() => setViewScale(v.value)}
-            className={`px-2 py-1 rounded-md font-semibold transition-colors ${
-              viewScale === v.value
-                ? "bg-custom-blue text-white"
-                : "bg-black/40 hover:bg-white/10 text-gray-300"
-            }`}
-          >
-            {v.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Quality */}
-      <div className="flex items-center gap-1">
+  const secondary = (
+    <>
+      <div className="flex items-center gap-1 flex-wrap">
         <span className="text-cyan-300/90 uppercase tracking-wider text-[0.62rem] mr-1">
           Quality
         </span>
@@ -224,11 +154,7 @@ export default function VizControls({
             key={q.value}
             type="button"
             onClick={() => setQuality(q.value)}
-            className={`px-2 py-1 rounded-md font-semibold transition-colors ${
-              quality === q.value
-                ? "bg-custom-blue text-white"
-                : "bg-black/40 hover:bg-white/10 text-gray-300"
-            }`}
+            className={chip(quality === q.value)}
           >
             {q.label}
           </button>
@@ -236,30 +162,30 @@ export default function VizControls({
       </div>
 
       <div className="flex flex-wrap gap-x-3 gap-y-1.5">
-        <label className="inline-flex items-center gap-1.5 cursor-pointer">
+        <label className="inline-flex items-center gap-1.5 cursor-pointer py-1">
           <input
             type="checkbox"
             checked={trueScale}
             onChange={(e) => setTrueScale(e.target.checked)}
-            className="accent-custom-blue"
+            className="accent-custom-blue h-3.5 w-3.5"
           />
           True-scale
         </label>
-        <label className="inline-flex items-center gap-1.5 cursor-pointer">
+        <label className="inline-flex items-center gap-1.5 cursor-pointer py-1">
           <input
             type="checkbox"
             checked={showLabels}
             onChange={(e) => setShowLabels(e.target.checked)}
-            className="accent-custom-blue"
+            className="accent-custom-blue h-3.5 w-3.5"
           />
           Labels
         </label>
-        <label className="inline-flex items-center gap-1.5 cursor-pointer">
+        <label className="inline-flex items-center gap-1.5 cursor-pointer py-1">
           <input
             type="checkbox"
             checked={audioEnabled}
             onChange={(e) => setAudioEnabled(e.target.checked)}
-            className="accent-custom-blue"
+            className="accent-custom-blue h-3.5 w-3.5"
           />
           Audio
         </label>
@@ -271,7 +197,7 @@ export default function VizControls({
           playClick();
           onScreenshot?.();
         }}
-        className="w-full px-2 py-1.5 rounded-md bg-black/50 border border-white/10 hover:border-sky-400/50 font-semibold"
+        className="w-full px-2 py-1.5 rounded-md bg-black/50 border border-white/10 hover:border-sky-400/50 font-semibold tap-target"
       >
         Screenshot
       </button>
@@ -282,6 +208,92 @@ export default function VizControls({
           mode. System view is for planets; main-belt rocks need different
           data.
         </p>
+      )}
+    </>
+  );
+
+  return (
+    <div
+      className={
+        embedded
+          ? `relative w-full flex flex-col gap-1.5 p-2 rounded-xl border border-white/10 bg-[#0f1623]/95 backdrop-blur-md text-[0.7rem] text-gray-300 shadow-xl ${
+              compact ? "max-h-[40dvh] overflow-y-auto overscroll-contain" : ""
+            }`
+          : "absolute z-30 bottom-12 left-1/2 -translate-x-1/2 md:left-auto md:right-4 md:translate-x-0 md:bottom-14 flex flex-col gap-2 p-2.5 rounded-xl border border-white/10 bg-[#0f1623]/90 backdrop-blur-md text-[0.7rem] text-gray-300 shadow-xl max-w-[min(92vw,300px)]"
+      }
+      role="toolbar"
+      aria-label="Visualization controls"
+    >
+      <div className="flex items-center justify-between gap-2 px-1">
+        <span className="text-cyan-300/90 uppercase tracking-wider text-[0.62rem]">
+          Mission clock
+        </span>
+        <span className="font-mono text-sky-200/95 text-xs tabular-nums">
+          {clockLabel}
+        </span>
+      </div>
+
+      <div className="flex items-center gap-1 flex-wrap">
+        <span className="text-cyan-300/90 uppercase tracking-wider text-[0.62rem] mr-1">
+          Time
+        </span>
+        {SPEEDS.map((s) => (
+          <button
+            key={s.value}
+            type="button"
+            onClick={() => setTimeScale(s.value)}
+            className={chip(timeScale === s.value)}
+            title={s.value === 0 ? "Pause" : `${s.value}× speed`}
+          >
+            {s.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="flex items-center gap-1 flex-wrap">
+        <span className="text-cyan-300/90 uppercase tracking-wider text-[0.62rem] mr-1">
+          Cam
+        </span>
+        {CAMERAS.map((c) => (
+          <button
+            key={c.value}
+            type="button"
+            onClick={() => setCameraMode(c.value)}
+            className={chip(cameraMode === c.value)}
+            title={c.title}
+            aria-pressed={cameraMode === c.value}
+          >
+            {c.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="flex items-center gap-1 flex-wrap">
+        <span className="text-cyan-300/90 uppercase tracking-wider text-[0.62rem] mr-1">
+          View
+        </span>
+        {VIEWS.map((v) => (
+          <button
+            key={v.value}
+            type="button"
+            title={v.title}
+            onClick={() => setViewScale(v.value)}
+            className={chip(viewScale === v.value)}
+          >
+            {compact && v.value === "nearEarth" ? "Near" : v.label}
+          </button>
+        ))}
+      </div>
+
+      {compact ? (
+        <details className="rounded-md border border-white/10 bg-black/20 px-2 py-1">
+          <summary className="cursor-pointer text-[10px] uppercase tracking-wider text-cyan-300/90 py-1 select-none">
+            More · quality, labels, screenshot
+          </summary>
+          <div className="flex flex-col gap-1.5 pb-1 pt-0.5">{secondary}</div>
+        </details>
+      ) : (
+        secondary
       )}
     </div>
   );

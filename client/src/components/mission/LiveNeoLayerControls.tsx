@@ -1,17 +1,16 @@
 import type { Dispatch } from "react";
 import type { IssPosition } from "@shared";
+import {
+  formatIssSampleAge,
+  formatIssVisibility,
+} from "@shared";
 import type { LiveMissionAction, LiveMissionState } from "../../mission/liveMissionState";
 import IssBriefing from "./IssBriefing";
 
 type LiveNeoLayerControlsProps = {
   live: LiveMissionState;
   dispatchLive: Dispatch<LiveMissionAction>;
-  searchTerm: string;
-  onSearchChange: (value: string) => void;
-  showHazardous: boolean;
-  onHazardousChange: (v: boolean) => void;
   iss: IssPosition | null;
-  /** False while only local seed is shown */
   issLive?: boolean;
   issAcquiring?: boolean;
   onShowIssChange: (v: boolean) => void;
@@ -20,15 +19,11 @@ type LiveNeoLayerControlsProps = {
 };
 
 /**
- * Search, miss/size filters, layer toggles (planets, ISS, Sentry).
+ * Scene layer toggles: planets, ISS, Sentry (+ compact ISS briefing).
  */
 export default function LiveNeoLayerControls({
   live,
   dispatchLive,
-  searchTerm,
-  onSearchChange,
-  showHazardous,
-  onHazardousChange,
   iss,
   issLive = false,
   issAcquiring = false,
@@ -36,75 +31,31 @@ export default function LiveNeoLayerControls({
   onIssFocusChange,
   onShowSentryChange,
 }: LiveNeoLayerControlsProps) {
-  const {
-    showPlanets,
-    showIss,
-    issFocus,
-    showSentry,
-    maxMissLd,
-    minDiameterM,
-  } = live;
+  const { showPlanets, showIss, issFocus, showSentry } = live;
+
+  const layerChips = [
+    showPlanets ? "Planets" : null,
+    showIss ? "ISS" : null,
+    showSentry ? "Sentry" : null,
+  ].filter(Boolean);
 
   return (
-    <>
-      <input
-        type="text"
-        placeholder="Filter list by name…"
-        value={searchTerm}
-        onChange={(e) => onSearchChange(e.target.value)}
-        className="w-full mb-2 px-2.5 py-1.5 rounded-md border border-white/10 bg-[#0c121c] text-white text-sm placeholder:text-gray-500"
-        aria-label="Filter asteroids by name"
-      />
-
-      <div className="flex flex-wrap gap-1.5 mb-2">
-        <select
-          value={maxMissLd ?? ""}
-          onChange={(e) => {
-            const v = e.target.value;
-            dispatchLive({
-              type: "SET_MAX_MISS_LD",
-              value: v === "" ? null : Number(v),
-            });
-          }}
-          className="text-[10px] px-1.5 py-1 rounded border border-white/10 bg-[#0c121c] text-gray-300"
-          aria-label="Max miss distance filter"
-        >
-          <option value="">Miss: any</option>
-          <option value="1">Miss &lt; 1 LD</option>
-          <option value="5">Miss &lt; 5 LD</option>
-          <option value="20">Miss &lt; 20 LD</option>
-        </select>
-        <select
-          value={minDiameterM ?? ""}
-          onChange={(e) => {
-            const v = e.target.value;
-            dispatchLive({
-              type: "SET_MIN_DIAMETER_M",
-              value: v === "" ? null : Number(v),
-            });
-          }}
-          className="text-[10px] px-1.5 py-1 rounded border border-white/10 bg-[#0c121c] text-gray-300"
-          aria-label="Min diameter filter"
-        >
-          <option value="">Size: any</option>
-          <option value="50">≥ 50 m</option>
-          <option value="140">≥ 140 m</option>
-          <option value="1000">≥ 1 km</option>
-        </select>
-      </div>
-
-      <label className="flex items-center gap-2 text-sm text-gray-300 mb-1.5 cursor-pointer">
-        <input
-          type="checkbox"
-          checked={showHazardous}
-          onChange={(e) => onHazardousChange(e.target.checked)}
-          className="h-4 w-4 accent-custom-blue"
-        />
-        Hazardous only
-      </label>
+    <div className="space-y-2">
+      {layerChips.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {layerChips.map((c) => (
+            <span
+              key={c}
+              className="text-[10px] px-1.5 py-0.5 rounded border border-sky-500/25 bg-sky-950/30 text-sky-200/90"
+            >
+              {c}
+            </span>
+          ))}
+        </div>
+      )}
 
       <label
-        className="flex items-center gap-2 text-sm text-gray-300 mb-1.5 cursor-pointer"
+        className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer"
         title="Hides other planets and orbital paths. Earth and Moon stay for Near-Earth context."
       >
         <input
@@ -121,10 +72,10 @@ export default function LiveNeoLayerControls({
         Other planets & orbits
       </label>
 
-      <div className="mb-2 space-y-1">
+      <div className="space-y-1">
         <label
           className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer"
-          title="Live ISS in Near-Earth (schematic LEO). Broad neighborhood view."
+          title="Live ISS in Near-Earth (schematic LEO)."
         >
           <input
             type="checkbox"
@@ -139,7 +90,7 @@ export default function LiveNeoLayerControls({
             </span>
           )}
           {showIss && issLive && iss && (
-            <span className="text-[10px] text-sky-400/90 tabular-nums font-normal">
+            <span className="text-[10px] text-sky-400/90 tabular-nums font-normal truncate">
               {iss.lat.toFixed(1)}° · {iss.lon.toFixed(1)}°
               {iss.altKm != null ? ` · ${Math.round(iss.altKm)} km` : ""}
             </span>
@@ -161,16 +112,20 @@ export default function LiveNeoLayerControls({
         )}
         {issFocus && (
           <p className="text-[10px] text-sky-400/70 ml-6 leading-snug">
-            Tight orbit of Earth · schematic LEO ring · station enlarged
+            Tight Earth orbit · LEO ring · station enlarged
           </p>
         )}
         {showIss && iss && (
-          <IssBriefing iss={iss} acquiring={issAcquiring || !issLive} />
+          <IssBriefing
+            iss={iss}
+            acquiring={issAcquiring || !issLive}
+            defaultCollapsed
+          />
         )}
       </div>
 
       <label
-        className="flex items-center gap-2 text-sm text-gray-300 mb-2.5 cursor-pointer"
+        className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer"
         title="CNEOS Sentry educational watchlist — not an impact alarm"
       >
         <input
@@ -181,6 +136,15 @@ export default function LiveNeoLayerControls({
         />
         Sentry watchlist
       </label>
-    </>
+
+      {showIss && issLive && iss && (
+        <p className="text-[10px] text-gray-600 leading-snug">
+          ISS · {formatIssVisibility(iss.visibility)}
+          {iss.timestampMs
+            ? ` · ${formatIssSampleAge(iss.timestampMs)}`
+            : ""}
+        </p>
+      )}
+    </div>
   );
 }

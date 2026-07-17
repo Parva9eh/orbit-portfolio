@@ -37,7 +37,7 @@ export default function MissionStatusBar({
   const approach = neo?.approach;
 
   return (
-    <footer className="absolute bottom-0 left-0 right-0 z-20 flex items-center justify-between gap-3 px-4 py-2 bg-black/80 border-t border-white/10 text-xs text-gray-400">
+    <footer className="absolute bottom-0 left-0 right-0 z-20 flex items-center justify-between gap-2 sm:gap-3 px-3 sm:px-4 py-2 safe-pad-x safe-pad-b bg-black/80 border-t border-white/10 text-xs text-gray-400">
       <div className="flex items-center gap-2 min-w-0">
         <span
           className={`w-1.5 h-1.5 rounded-full shrink-0 ${
