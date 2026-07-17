@@ -8,7 +8,9 @@
     "build": "tsc -p tsconfig.json --noEmit && vite build",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.node.json --noEmit",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.4",
@@ -23,6 +25,7 @@
     "three-stdlib": "^2.36.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.51.0",
     "@eslint/js": "^9.33.0",
     "@types/lodash": "^4.17.13",
     "@types/node": "^22.20.1",

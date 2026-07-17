@@ -26,7 +26,7 @@ export default function NeoMissList({
         By miss distance
       </p>
       <ul
-        className={`space-y-1 max-h-32 overflow-y-auto ${loading ? "opacity-50" : ""}`}
+        className={`space-y-1 max-h-40 sm:max-h-48 overflow-y-auto overscroll-contain ${loading ? "opacity-50" : ""}`}
       >
         {asteroids.map((neo, index) => {
           const miss = neo.approach

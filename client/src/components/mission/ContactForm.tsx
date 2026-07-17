@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useState, type FocusEvent, type FormEvent } from "react";
 
 type Status = "idle" | "sending" | "sent" | "error";
 
@@ -155,6 +155,19 @@ export default function ContactForm() {
 
   const busy = status === "sending";
 
+  /** Keep focused field visible when the mobile keyboard opens */
+  function scrollFieldIntoView(e: FocusEvent<HTMLElement>) {
+    const el = e.currentTarget;
+    // Delay so the visual viewport has resized after the keyboard
+    window.setTimeout(() => {
+      el.scrollIntoView({
+        block: "center",
+        behavior: "smooth",
+        inline: "nearest",
+      });
+    }, 120);
+  }
+
   return (
     <form onSubmit={onSubmit} className="space-y-2.5" noValidate>
       {!configured && (
@@ -193,6 +206,7 @@ export default function ContactForm() {
           className={`${inputClass} ${fieldErrors.name ? inputErr : inputOk}`}
           placeholder="Your name"
           autoComplete="name"
+          onFocus={scrollFieldIntoView}
           onChange={() =>
             setFieldErrors((e) => ({ ...e, name: undefined }))
           }
@@ -226,6 +240,7 @@ export default function ContactForm() {
           placeholder="name@example.com"
           autoComplete="email"
           inputMode="email"
+          onFocus={scrollFieldIntoView}
           onChange={() =>
             setFieldErrors((e) => ({ ...e, email: undefined }))
           }
@@ -261,6 +276,7 @@ export default function ContactForm() {
             fieldErrors.message ? inputErr : inputOk
           }`}
           placeholder="Roles, collabs, architecture questions…"
+          onFocus={scrollFieldIntoView}
           onChange={() =>
             setFieldErrors((e) => ({ ...e, message: undefined }))
           }

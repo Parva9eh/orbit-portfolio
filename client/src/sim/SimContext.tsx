@@ -46,7 +46,8 @@ export function SimProvider({ children }: { children: ReactNode }) {
   const [trueScale, setTrueScale] = useState(false);
   const [showLabels, setShowLabels] = useState(true);
   const [audioEnabled, setAudioEnabled] = useState(false);
-  const [cameraMode, setCameraMode] = useState<CameraMode>("tour");
+  /** Default Free so users can orbit immediately; Tour/Focus are opt-in */
+  const [cameraMode, setCameraMode] = useState<CameraMode>("free");
   const [quality, setQuality] = useState<QualityPreset>("cinematic");
   const [viewScale, setViewScale] = useState<ViewScale>("system");
 
