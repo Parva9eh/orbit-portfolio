@@ -91,13 +91,16 @@ export function useMissionFeeds({
     error: plErr,
   } = useApiData<Planet>("/planets", planetOpts);
 
+  // Server may clamp out-of-range pages (e.g. 99 → last). Only sync when we
+  // have *fresh* data for the current request — never from a previous page's
+  // payload (that was reverting Next/Prev before the new fetch settled).
   useEffect(() => {
-    if (!asteroidsData?.pagination) return;
-    dispatchLive({
-      type: "SET_PAGE",
-      page: asteroidsData.pagination.currentPage,
-    });
-  }, [asteroidsData, dispatchLive]);
+    if (astLoad || !asteroidsData?.pagination) return;
+    const serverPage = asteroidsData.pagination.currentPage;
+    if (serverPage !== page) {
+      dispatchLive({ type: "SET_PAGE", page: serverPage });
+    }
+  }, [asteroidsData, dispatchLive, page, astLoad]);
 
   const filteredAsteroids = useMemo(
     () =>
@@ -167,8 +170,19 @@ export function useMissionFeeds({
 
   const loading = plLoad || (showAsteroids && astLoad);
   const error = plErr || (showAsteroids ? astErr : null);
-  const totalPages = asteroidsData?.pagination?.totalPages ?? 1;
-  const currentPage = asteroidsData?.pagination?.currentPage ?? page;
+  const totalItems = asteroidsData?.pagination?.totalItems ?? 0;
+  const totalPages = Math.max(
+    1,
+    asteroidsData?.pagination?.totalPages ?? 1
+  );
+  /** Requested page from live state (source of truth for Prev/Next) */
+  const currentPage = page;
+  /**
+   * True while the catalog request for `page` has not resolved.
+   * useApiData now returns null data for mismatched keys, so astLoad alone
+   * covers page transitions — no stale list flash.
+   */
+  const pagePending = Boolean(showAsteroids && astLoad);
 
   return {
     asteroidsData,
@@ -189,8 +203,10 @@ export function useMissionFeeds({
     solar,
     loading,
     error,
+    totalItems,
     totalPages,
     currentPage,
+    pagePending,
     astLoad,
   };
 }

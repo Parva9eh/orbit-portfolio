@@ -81,7 +81,7 @@ export function liveMissionReducer(
     case "SET_DATE":
       return { ...state, approachDate: action.date, page: 1 };
     case "SET_PAGE":
-      return { ...state, page: action.page };
+      return { ...state, page: Math.max(1, Math.floor(action.page) || 1) };
     case "SET_SEARCH":
       return { ...state, searchTerm: action.value };
     case "SET_HAZARDOUS":

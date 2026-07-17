@@ -18,6 +18,17 @@ type CacheEntry<T> = {
   expiresAt: number;
 };
 
+type StateEntry<T> = {
+  /** Cache key this payload was fetched for */
+  key: string;
+  data: PaginatedResponse<T>;
+};
+
+type ErrorEntry = {
+  key: string;
+  error: Error;
+};
+
 const API_CACHE = new Map<string, CacheEntry<unknown>>();
 /** Share one in-flight request per cache key (React StrictMode / dual hooks). */
 const INFLIGHT = new Map<string, Promise<PaginatedResponse<unknown>>>();
@@ -88,9 +99,8 @@ export function useApiData<T>(
   loading: boolean;
   error: Error | null;
 } {
-  const [data, setData] = useState<PaginatedResponse<T> | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
+  const [entry, setEntry] = useState<StateEntry<T> | null>(null);
+  const [errorEntry, setErrorEntry] = useState<ErrorEntry | null>(null);
 
   const isDev = import.meta.env.MODE === "development";
   const fullUrl = `${getApiBaseUrl()}${endpoint}`;
@@ -111,25 +121,35 @@ export function useApiData<T>(
   const enabled = options.enabled !== false;
   const requestId = useRef(0);
 
+  /**
+   * Only expose data that matches the current request key.
+   * Prevents page N−1 rows from rendering while page N is in flight
+   * (which also broke Prev/Next via the server-page sync effect).
+   */
+  const data: PaginatedResponse<T> | null =
+    entry?.key === cacheKey ? entry.data : null;
+  const error =
+    errorEntry?.key === cacheKey ? errorEntry.error : null;
+  // No matching data yet → loading (unless this key already failed)
+  const loading = Boolean(enabled && data === null && !error);
+
   useEffect(() => {
-    if (!enabled) {
-      setLoading(false);
-      return;
-    }
+    if (!enabled) return;
+
+    // Already have matching in-memory entry
+    if (entry?.key === cacheKey) return;
 
     let isMounted = true;
     const id = ++requestId.current;
     const cached = useCache ? getCached<T>(cacheKey) : undefined;
 
-    if (cached?.data) {
-      setData(cached);
-      setError(null);
-      setLoading(false);
+    if (cached) {
+      setEntry({ key: cacheKey, data: cached });
+      setErrorEntry(null);
       return;
     }
 
-    setLoading(true);
-    setError(null);
+    setErrorEntry(null);
 
     const fetchData = async (retries: number): Promise<void> => {
       try {
@@ -157,12 +177,32 @@ export function useApiData<T>(
         if (!isMounted || id !== requestId.current) return;
 
         if (result && Array.isArray(result.data)) {
-          setData(result);
+          setEntry({ key: cacheKey, data: result });
+          setErrorEntry(null);
           if (useCache) {
             setCached(cacheKey, result, ttlMs);
+            // If server clamped the page (e.g. 99 → 4), also cache under the
+            // clamped page key so the follow-up SET_PAGE does not refetch.
+            const reqPage = Number(resolvedParams.page ?? 1);
+            const serverPage = result.pagination?.currentPage;
+            if (
+              serverPage != null &&
+              serverPage !== reqPage &&
+              Number.isFinite(serverPage)
+            ) {
+              const clampedParams = {
+                ...resolvedParams,
+                page: serverPage,
+              };
+              const clampedKey = `${fullUrl}?${stableParamsKey(clampedParams)}`;
+              setCached(clampedKey, result, ttlMs);
+            }
           }
         } else {
-          setError(new Error("Invalid API response"));
+          setErrorEntry({
+            key: cacheKey,
+            error: new Error("Invalid API response"),
+          });
         }
       } catch (err) {
         if (!isMounted || id !== requestId.current) return;
@@ -171,11 +211,10 @@ export function useApiData<T>(
           await new Promise((resolve) => setTimeout(resolve, 1000));
           await fetchData(retries - 1);
         } else {
-          setError(err instanceof Error ? err : new Error(String(err)));
-        }
-      } finally {
-        if (isMounted && id === requestId.current) {
-          setLoading(false);
+          setErrorEntry({
+            key: cacheKey,
+            error: err instanceof Error ? err : new Error(String(err)),
+          });
         }
       }
     };
@@ -185,6 +224,8 @@ export function useApiData<T>(
     return () => {
       isMounted = false;
     };
+    // `entry` is read for a same-key short-circuit only; deps stay on the request identity.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional
   }, [
     cacheKey,
     fullUrl,
