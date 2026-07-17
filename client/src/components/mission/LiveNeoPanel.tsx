@@ -46,6 +46,8 @@ export default function LiveNeoPanel({ embedded = false }: LiveNeoPanelProps) {
     onCopyLink,
     copyLinkStatus,
     iss,
+    issLive,
+    issAcquiring,
     onShowIssChange,
     onIssFocusChange,
     sentryList,
@@ -154,6 +156,8 @@ export default function LiveNeoPanel({ embedded = false }: LiveNeoPanelProps) {
           showHazardous={showHazardous}
           onHazardousChange={onHazardousChange}
           iss={iss}
+          issLive={issLive}
+          issAcquiring={issAcquiring}
           onShowIssChange={onShowIssChange}
           onIssFocusChange={onIssFocusChange}
           onShowSentryChange={onShowSentryChange}

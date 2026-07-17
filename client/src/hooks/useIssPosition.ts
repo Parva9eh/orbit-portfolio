@@ -3,26 +3,43 @@ import { DEFAULT_ISS, type IssPosition } from "@shared";
 import { useApiResource } from "./useApiResource";
 
 /**
- * P5 — poll ISS when enabled. Seeds DEFAULT_ISS immediately so the LEO ring
- * does not wait on the network.
+ * Poll ISS when enabled. Seeds DEFAULT_ISS for the LEO ring immediately, but
+ * UI should treat `source === "mock"` as "acquiring" — not live telemetry.
  */
 export function useIssPosition(enabled: boolean): {
+  /** Position for the scene (seed until first live sample) */
   iss: IssPosition | null;
+  /** True once a non-mock network sample has arrived */
+  isLive: boolean;
+  /** True while enabled and still only showing the local seed */
+  acquiring: boolean;
   loading: boolean;
   error: Error | null;
 } {
+  // timestampMs: 0 → age label is "seed", not "just now"
   const seed = useMemo<IssPosition>(
-    () => ({ ...DEFAULT_ISS, timestampMs: Date.now() }),
-    // re-seed when re-enabled so timestamp is fresh
+    () => ({ ...DEFAULT_ISS, timestampMs: 0 }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [enabled]
   );
+
   const { data, loading, error } = useApiResource<IssPosition>({
     path: "/iss",
     enabled,
-    pollMs: 10_000,
-    timeoutMs: 8_000,
+    pollMs: 12_000,
+    timeoutMs: 28_000,
     initialData: seed,
   });
-  return { iss: data, loading, error };
+
+  const iss = data;
+  const isLive = Boolean(iss && iss.source !== "mock");
+  const acquiring = Boolean(enabled && !isLive);
+
+  return {
+    iss,
+    isLive,
+    acquiring,
+    loading: acquiring || loading,
+    error,
+  };
 }

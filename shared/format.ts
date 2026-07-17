@@ -176,3 +176,31 @@ export function formatExportSummary(input: {
   );
   return lines.filter((l) => l !== "").join("\n");
 }
+
+/** Human sample age for live ISS telemetry. */
+export function formatIssSampleAge(timestampMs: number, nowMs = Date.now()): string {
+  if (!timestampMs || timestampMs <= 0) return "seed";
+  const sec = Math.max(0, Math.round((nowMs - timestampMs) / 1000));
+  if (sec < 5) return "just now";
+  if (sec < 60) return `${sec}s ago`;
+  const min = Math.round(sec / 60);
+  if (min < 60) return `${min}m ago`;
+  return `${Math.round(min / 60)}h ago`;
+}
+
+export function formatIssVisibility(
+  v: import("./live").IssVisibility | null | undefined
+): string {
+  if (v === "daylight") return "Daylight";
+  if (v === "eclipsed") return "Earth shadow";
+  return "Visibility n/a";
+}
+
+export function formatIssVelocityDisplay(
+  velocityKmS: number | null | undefined
+): string {
+  if (velocityKmS == null || !Number.isFinite(velocityKmS) || velocityKmS <= 0)
+    return "—";
+  const kmh = velocityKmS * 3600;
+  return `${velocityKmS.toFixed(2)} km/s · ${Math.round(kmh).toLocaleString("en-US")} km/h`;
+}

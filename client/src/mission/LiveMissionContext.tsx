@@ -41,6 +41,9 @@ export type LiveMissionTools = {
   copyLinkStatus: "idle" | "copied" | "failed";
 
   iss: IssPosition | null;
+  /** False while only the local LEO seed is available */
+  issLive: boolean;
+  issAcquiring: boolean;
   onShowIssChange: (v: boolean) => void;
   onIssFocusChange: (v: boolean) => void;
 
