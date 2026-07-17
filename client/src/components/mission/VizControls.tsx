@@ -16,10 +16,22 @@ const SPEEDS: { value: TimeScalePreset; label: string }[] = [
   { value: 10, label: "10×" },
 ];
 
-const CAMERAS: { value: CameraMode; label: string }[] = [
-  { value: "free", label: "Free" },
-  { value: "tour", label: "Tour" },
-  { value: "focus", label: "Focus" },
+const CAMERAS: { value: CameraMode; label: string; title: string }[] = [
+  {
+    value: "free",
+    label: "Free",
+    title: "Drag to orbit, scroll to zoom (default)",
+  },
+  {
+    value: "tour",
+    label: "Tour",
+    title: "Auto cinematic orbit of the system or Earth neighborhood",
+  },
+  {
+    value: "focus",
+    label: "Focus",
+    title: "Dolly toward the selected body (pick a NEO or planet first)",
+  },
 ];
 
 const QUALITY: { value: QualityPreset; label: string }[] = [
@@ -248,13 +260,8 @@ export default function VizControls({
             type="button"
             onClick={() => setCameraMode(c.value)}
             className={chip(cameraMode === c.value)}
-            title={
-              c.value === "free"
-                ? "Manual orbit controls"
-                : c.value === "tour"
-                  ? "Auto cinematic tour"
-                  : "Dolly to selected body"
-            }
+            title={c.title}
+            aria-pressed={cameraMode === c.value}
           >
             {c.label}
           </button>
