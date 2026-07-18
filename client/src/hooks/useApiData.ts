@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import axios from "axios";
 import type { PaginatedResponse } from "@shared";
 import { getApiBaseUrl } from "../lib/apiBase";
@@ -11,6 +11,8 @@ export type UseApiDataOptions = {
   params?: Record<string, string | number | boolean | undefined>;
   /** Client memory TTL in ms (default 5 min). */
   ttlMs?: number;
+  /** Request timeout ms (default 30s — accommodates free-tier API cold starts). */
+  timeoutMs?: number;
 };
 
 type CacheEntry<T> = {
@@ -35,7 +37,8 @@ const INFLIGHT = new Map<string, Promise<PaginatedResponse<unknown>>>();
 
 const DEFAULT_TTL_MS = 5 * 60 * 1000;
 const MAX_CACHE_ENTRIES = 64;
-const REQUEST_TIMEOUT_MS = 15_000;
+/** Free Render cold start can exceed 15s — give the API room before failing. */
+const DEFAULT_TIMEOUT_MS = 30_000;
 
 /** Stable serialize params for cache keys (sorted keys). */
 function stableParamsKey(
@@ -91,6 +94,11 @@ function setCached<T>(
   }
 }
 
+function dropCacheKey(key: string): void {
+  API_CACHE.delete(key);
+  INFLIGHT.delete(key);
+}
+
 export function useApiData<T>(
   endpoint: string,
   options: UseApiDataOptions = {}
@@ -98,9 +106,12 @@ export function useApiData<T>(
   data: PaginatedResponse<T> | null;
   loading: boolean;
   error: Error | null;
+  /** Bust cache for the current key and re-request. */
+  refetch: () => void;
 } {
   const [entry, setEntry] = useState<StateEntry<T> | null>(null);
   const [errorEntry, setErrorEntry] = useState<ErrorEntry | null>(null);
+  const [reloadToken, setReloadToken] = useState(0);
 
   const isDev = import.meta.env.MODE === "development";
   const fullUrl = `${getApiBaseUrl()}${endpoint}`;
@@ -117,6 +128,7 @@ export function useApiData<T>(
   const cacheKey = `${fullUrl}?${paramsKey}`;
   const useCache = options.cache !== false;
   const ttlMs = options.ttlMs ?? DEFAULT_TTL_MS;
+  const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const retryDefault = options.retry ?? (isDev ? 0 : 3);
   const enabled = options.enabled !== false;
   const requestId = useRef(0);
@@ -133,10 +145,17 @@ export function useApiData<T>(
   // No matching data yet → loading (unless this key already failed)
   const loading = Boolean(enabled && data === null && !error);
 
+  const refetch = useCallback(() => {
+    dropCacheKey(cacheKey);
+    setEntry((prev) => (prev?.key === cacheKey ? null : prev));
+    setErrorEntry((prev) => (prev?.key === cacheKey ? null : prev));
+    setReloadToken((t) => t + 1);
+  }, [cacheKey]);
+
   useEffect(() => {
     if (!enabled) return;
 
-    // Already have matching in-memory entry
+    // Already have matching in-memory entry (refetch clears entry first)
     if (entry?.key === cacheKey) return;
 
     let isMounted = true;
@@ -161,7 +180,7 @@ export function useApiData<T>(
           pending = axios
             .get<PaginatedResponse<T>>(fullUrl, {
               params: resolvedParams,
-              timeout: REQUEST_TIMEOUT_MS,
+              timeout: timeoutMs,
             })
             .then((res) => res.data)
             .finally(() => {
@@ -234,7 +253,9 @@ export function useApiData<T>(
     useCache,
     enabled,
     ttlMs,
+    timeoutMs,
+    reloadToken,
   ]);
 
-  return { data, loading, error };
+  return { data, loading, error, refetch };
 }
