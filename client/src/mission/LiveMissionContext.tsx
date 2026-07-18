@@ -28,11 +28,17 @@ export type LiveMissionTools = {
   closestSummary: string | null;
   /** Catalog size for the current date/filter (server total, not just this page) */
   totalItems: number;
+  /** Server page size (for global row indices) */
+  pageLimit: number;
   totalPages: number;
   currentPage: number;
   /** True while requested page data is not yet available */
   pagePending?: boolean;
   loading: boolean;
+  /** Catalog-only error (for Retry / demo fallback UI) */
+  catalogError?: Error | null;
+  onRetryCatalog?: () => void;
+  onUseDemoCatalog?: () => void;
 
   sbdb: SbdbOrbitResult | null;
   sbdbLoading: boolean;

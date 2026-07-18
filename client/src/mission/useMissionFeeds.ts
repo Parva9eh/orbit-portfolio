@@ -16,6 +16,9 @@ import {
 import type { LiveMissionState } from "./liveMissionState";
 import type { MissionSession } from "./useMissionSession";
 
+/** Page size for NEO catalog — keeps the list scannable in the side panel. */
+export const CATALOG_PAGE_LIMIT = 12;
+
 type FeedsArgs = {
   live: LiveMissionState;
   mode: MissionSession["mode"];
@@ -52,7 +55,10 @@ export function useMissionFeeds({
     showSentry,
     maxMissLd,
     minDiameterM,
+    forceMockCatalog,
   } = live;
+
+  const useMock = isDev || forceMockCatalog;
 
   const asteroidOpts = useMemo(
     () => ({
@@ -62,12 +68,12 @@ export function useMissionFeeds({
       params: {
         start_date: approachDate,
         page,
-        mock: isDev ? "true" : "false",
-        limit: 25,
+        mock: useMock ? ("true" as const) : ("false" as const),
+        limit: CATALOG_PAGE_LIMIT,
         ...(showHazardous ? { hazardous: "true" as const } : {}),
       },
     }),
-    [approachDate, page, isDev, showHazardous, showAsteroids]
+    [approachDate, page, isDev, useMock, showHazardous, showAsteroids]
   );
 
   const planetOpts = useMemo(
@@ -83,6 +89,7 @@ export function useMissionFeeds({
     data: asteroidsData,
     loading: astLoad,
     error: astErr,
+    refetch: refetchAsteroids,
   } = useApiData<Asteroid>("/asteroids", asteroidOpts);
 
   const {
@@ -171,6 +178,8 @@ export function useMissionFeeds({
   const loading = plLoad || (showAsteroids && astLoad);
   const error = plErr || (showAsteroids ? astErr : null);
   const totalItems = asteroidsData?.pagination?.totalItems ?? 0;
+  const pageLimit =
+    asteroidsData?.pagination?.limit ?? CATALOG_PAGE_LIMIT;
   const totalPages = Math.max(
     1,
     asteroidsData?.pagination?.totalPages ?? 1
@@ -203,11 +212,14 @@ export function useMissionFeeds({
     solar,
     loading,
     error,
+    catalogError: showAsteroids ? astErr : null,
     totalItems,
+    pageLimit,
     totalPages,
     currentPage,
     pagePending,
     astLoad,
+    refetchAsteroids,
   };
 }
 
