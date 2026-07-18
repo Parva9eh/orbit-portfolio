@@ -10,6 +10,13 @@ type MissionTopBarProps = {
   onModeChange: (mode: ViewMode) => void;
 };
 
+const STEP_SHORT: Record<string, string> = {
+  briefing: "Brief",
+  projects: "Work",
+  live: "Live",
+  comms: "Comms",
+};
+
 export default function MissionTopBar({
   brand,
   step,
@@ -17,6 +24,8 @@ export default function MissionTopBar({
   onStepChange,
   onModeChange,
 }: MissionTopBarProps) {
+  const active = MISSION_STEPS.find((s) => s.id === step);
+
   return (
     <header
       className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between gap-2 sm:gap-3
@@ -24,12 +33,17 @@ export default function MissionTopBar({
         safe-pad-x safe-pad-t
         bg-gradient-to-b from-black/90 via-black/70 to-transparent"
     >
-      <div className="font-bold tracking-widest text-sm md:text-base shrink-0">
-        {brand}
-        <span className="text-custom-blue">.</span>
+      <div className="shrink-0 min-w-0">
+        <div className="font-bold tracking-widest text-sm md:text-base">
+          {brand}
+          <span className="text-custom-blue">.</span>
+        </div>
+        <p className="sm:hidden text-[9px] uppercase tracking-wider text-cyan-300/70 truncate max-w-[5.5rem]">
+          {STEP_SHORT[step] ?? active?.section ?? step}
+        </p>
       </div>
 
-      {/* Mobile + desktop: scrollable steps (was hidden on xs — no step nav) */}
+      {/* Mobile + desktop: scrollable steps */}
       <nav
         className="flex flex-1 min-w-0 max-w-[min(52vw,16rem)] sm:max-w-none
           gap-1 justify-start sm:justify-center overflow-x-auto scrollbar-none
@@ -45,6 +59,7 @@ export default function MissionTopBar({
               onClick={() => onStepChange(s.id)}
               title={s.label}
               className={`shrink-0 text-[11px] sm:text-xs px-2.5 sm:px-3 py-1.5 rounded-lg border transition-colors tap-target
+                focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400
                 ${
                   step === s.id
                     ? "text-white bg-custom-blue/20 border-custom-blue/50"
