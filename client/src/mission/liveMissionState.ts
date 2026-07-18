@@ -25,6 +25,8 @@ export type LiveMissionState = {
   rulerA: RulerEndpoint | null;
   rulerB: RulerEndpoint | null;
   rulerSceneDist: number | null;
+  /** When true, catalog requests use mock data (demo fallback after API failure). */
+  forceMockCatalog: boolean;
 };
 
 export type LiveMissionAction =
@@ -32,6 +34,7 @@ export type LiveMissionAction =
   | { type: "SET_PAGE"; page: number }
   | { type: "SET_SEARCH"; value: string }
   | { type: "SET_HAZARDOUS"; value: boolean }
+  | { type: "SET_FORCE_MOCK"; value: boolean }
   | { type: "SET_SHOW_PLANETS"; value: boolean }
   | { type: "SET_COMPARE"; ids: string[] }
   | { type: "TOGGLE_COMPARE"; id: string }
@@ -70,6 +73,7 @@ export function initialLiveMissionState(
     rulerA: null,
     rulerB: null,
     rulerSceneDist: null,
+    forceMockCatalog: false,
   };
 }
 
@@ -86,6 +90,8 @@ export function liveMissionReducer(
       return { ...state, searchTerm: action.value };
     case "SET_HAZARDOUS":
       return { ...state, showHazardous: action.value, page: 1 };
+    case "SET_FORCE_MOCK":
+      return { ...state, forceMockCatalog: action.value, page: 1 };
     case "SET_SHOW_PLANETS":
       return { ...state, showPlanets: action.value };
     case "SET_COMPARE":
