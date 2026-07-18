@@ -7,6 +7,7 @@ import LiveNeoPanel from "./LiveNeoPanel";
 import type { MissionStepId } from "../../content/site";
 import type { CelestialItem, IssPosition } from "@shared";
 import type { DonkiSolarBadge } from "../../hooks/useDonkiSolar";
+import { useSlowLoading } from "../../hooks/useSlowLoading";
 
 type MissionShellProps = {
   brand: string;
@@ -65,6 +66,7 @@ export default function MissionShell({
     false
   );
   const mobileChrome = narrow || landscape;
+  const waking = useSlowLoading(status.loading, 3000);
 
   // Viz: collapsed by default on phone portrait; open on desktop / when leaving narrow
   const [vizOpen, setVizOpen] = useState(() => !narrow);
@@ -74,12 +76,26 @@ export default function MissionShell({
 
   // Live tools: collapsed by default on mobile so canvas is first paint
   const [liveOpenMobile, setLiveOpenMobile] = useState(false);
-  // When user enters Live mode on mobile, keep collapsed until they tap Show
   useEffect(() => {
     if (!liveToolsOpen) setLiveOpenMobile(false);
   }, [liveToolsOpen]);
 
   const showLivePanel = liveToolsOpen && (!mobileChrome || liveOpenMobile);
+
+  // Esc closes mobile Live sheet (selection clear is handled in LiveNeoPanel)
+  useEffect(() => {
+    if (!liveOpenMobile || !mobileChrome) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName?.toLowerCase();
+      if (tag === "input" || tag === "textarea" || tag === "select") return;
+      e.preventDefault();
+      setLiveOpenMobile(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [liveOpenMobile, mobileChrome]);
 
   return (
     <div
@@ -96,21 +112,26 @@ export default function MissionShell({
         onModeChange={onModeChange}
       />
 
-      <MissionDock
-        step={step}
-        onStepChange={onStepChange}
-        onEnterLive={onEnterLive}
-        landscape={landscape}
-      />
+      {/* Hide story dock when mobile Live sheet is open so sheet can use height */}
+      {!(narrow && showLivePanel && !landscape) && (
+        <MissionDock
+          step={step}
+          onStepChange={onStepChange}
+          onEnterLive={onEnterLive}
+          landscape={landscape}
+        />
+      )}
 
-      {/* Mobile / landscape: quick toggles so panels don't permanently cover the 3D scene */}
+      {/* Mobile / landscape: quick toggles */}
       {mobileChrome && (
         <div
           className={`absolute z-40 pointer-events-auto flex gap-1.5 safe-pad-b
             ${
               landscape
                 ? "right-3 top-1/2 -translate-y-1/2 flex-col"
-                : "left-1/2 -translate-x-1/2 bottom-[3.25rem]"
+                : showLivePanel
+                  ? "left-1/2 -translate-x-1/2 bottom-[min(58dvh,28rem)]"
+                  : "left-1/2 -translate-x-1/2 bottom-[3.25rem]"
             }`}
         >
           {liveToolsOpen && (
@@ -118,17 +139,20 @@ export default function MissionShell({
               type="button"
               onClick={() => setLiveOpenMobile((v) => !v)}
               className="text-[11px] font-semibold px-3 py-1.5 rounded-full border border-white/15
-                bg-black/70 backdrop-blur-md text-sky-200 tap-target shadow-lg whitespace-nowrap"
+                bg-black/70 backdrop-blur-md text-sky-200 tap-target shadow-lg whitespace-nowrap
+                focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400"
               aria-pressed={liveOpenMobile}
+              aria-label={liveOpenMobile ? "Hide NEO tools" : "Show NEO tools"}
             >
-              {liveOpenMobile ? "Hide NEO tools" : "Show NEO tools"}
+              {liveOpenMobile ? "Hide tools" : "NEO tools"}
             </button>
           )}
           <button
             type="button"
             onClick={() => setVizOpen((v) => !v)}
             className="text-[11px] font-semibold px-3 py-1.5 rounded-full border border-white/15
-              bg-black/70 backdrop-blur-md text-cyan-200 tap-target shadow-lg"
+              bg-black/70 backdrop-blur-md text-cyan-200 tap-target shadow-lg
+              focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400"
             aria-pressed={vizOpen}
           >
             {vizOpen ? "Hide viz" : "Viz"}
@@ -138,9 +162,9 @@ export default function MissionShell({
 
       {/*
         Chrome stack:
-        - Portrait mobile: Live Neo above dock (toggle); viz bottom
-        - Landscape: Live tools slide over from the right; dock is left half
-        - Desktop: right rail — Live Neo flexes above VizControls
+        - Portrait mobile: Live Neo as bottom sheet
+        - Landscape: Live tools from the right
+        - Desktop: right rail
       */}
       <div
         className={
@@ -148,13 +172,46 @@ export default function MissionShell({
             ? `absolute z-30 pointer-events-none top-14 bottom-12 right-0 w-[min(42vw,320px)]
                 flex flex-col gap-2 p-2 transition-transform duration-200 ease-out
                 ${showLivePanel || vizOpen ? "translate-x-0" : "translate-x-full"}`
-            : `absolute z-30 pointer-events-none inset-0
-                md:inset-auto md:right-4 md:top-16 md:bottom-14 md:w-[min(320px,92vw)]
-                md:flex md:flex-col md:gap-2
-                max-md:safe-pad-x`
+            : narrow
+              ? "absolute z-30 pointer-events-none inset-0"
+              : `absolute z-30 pointer-events-none inset-0
+                  md:inset-auto md:right-4 md:top-16 md:bottom-14 md:w-[min(320px,92vw)]
+                  md:flex md:flex-col md:gap-2
+                  max-md:safe-pad-x`
         }
       >
-        {showLivePanel && (
+        {/* Mobile portrait bottom sheet */}
+        {narrow && !landscape && showLivePanel && (
+          <>
+            <button
+              type="button"
+              aria-label="Dismiss NEO tools"
+              className="absolute inset-0 z-0 bg-black/40 pointer-events-auto animate-fade-in"
+              onClick={() => setLiveOpenMobile(false)}
+            />
+            <div
+              className="absolute left-0 right-0 bottom-0 z-10 pointer-events-auto
+                h-[min(58dvh,28rem)] max-h-[calc(100dvh-5.5rem)]
+                safe-pad-x safe-pad-b
+                px-2 pb-2 pt-0
+                animate-fade-in"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Live NEO tools"
+            >
+              <div className="h-full rounded-t-2xl overflow-hidden shadow-2xl border border-white/10 border-b-0">
+                <LiveNeoPanel
+                  embedded
+                  sheet
+                  onRequestClose={() => setLiveOpenMobile(false)}
+                />
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* Landscape + desktop Live panel */}
+        {showLivePanel && (!narrow || landscape) && (
           <div
             className={
               landscape
@@ -171,7 +228,8 @@ export default function MissionShell({
             <LiveNeoPanel embedded />
           </div>
         )}
-        {(vizOpen || !mobileChrome) && (
+
+        {(vizOpen || !mobileChrome) && !(narrow && showLivePanel && !landscape) && (
           <div
             className={
               landscape
@@ -192,7 +250,6 @@ export default function MissionShell({
         )}
       </div>
 
-      {/* Landscape dim when tools open — tap empty to keep focus on canvas feel */}
       {landscape && showLivePanel && (
         <button
           type="button"
@@ -205,6 +262,7 @@ export default function MissionShell({
 
       <MissionStatusBar
         loading={status.loading}
+        waking={waking}
         error={status.error}
         mode={mode}
         selectedItem={status.selectedItem}

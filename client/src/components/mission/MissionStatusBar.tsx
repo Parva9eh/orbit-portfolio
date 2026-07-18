@@ -12,6 +12,8 @@ import type { DonkiSolarBadge } from "../../hooks/useDonkiSolar";
 
 type MissionStatusBarProps = {
   loading: boolean;
+  /** True after loading exceeds cold-start threshold */
+  waking?: boolean;
   error: Error | null;
   mode: ViewMode;
   selectedItem?: CelestialItem | null;
@@ -24,6 +26,7 @@ type MissionStatusBarProps = {
 
 export default function MissionStatusBar({
   loading,
+  waking = false,
   error,
   mode,
   selectedItem = null,
@@ -35,6 +38,14 @@ export default function MissionStatusBar({
 }: MissionStatusBarProps) {
   const neo = selectedItem && isAsteroid(selectedItem) ? selectedItem : null;
   const approach = neo?.approach;
+
+  const statusText = error
+    ? `Signal degraded · ${error.message || "API error"}`
+    : loading && waking
+      ? "Waking mission API (free tier)…"
+      : loading
+        ? "Receiving telemetry…"
+        : "Systems nominal";
 
   return (
     <footer className="absolute bottom-0 left-0 right-0 z-20 flex items-center justify-between gap-2 sm:gap-3 px-3 sm:px-4 py-2 safe-pad-x safe-pad-b bg-black/80 border-t border-white/10 text-xs text-gray-400">
@@ -49,12 +60,8 @@ export default function MissionStatusBar({
           }`}
           aria-hidden
         />
-        <span className="truncate">
-          {error
-            ? `Signal degraded · ${error.message || "API error"}`
-            : loading
-              ? "Receiving telemetry…"
-              : "Systems nominal"}
+        <span className="truncate" aria-live="polite">
+          {statusText}
         </span>
       </div>
 
