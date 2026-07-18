@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import {
   MISSION_STEPS,
   site,
@@ -37,11 +37,44 @@ function statusTone(status: ProjectStatus): "live" | "progress" | "soon" {
   return "soon";
 }
 
-function BriefingBody() {
+function statusBorder(status: ProjectStatus): string {
+  if (status === "live") return "border-l-emerald-400/70";
+  if (status === "in-progress") return "border-l-amber-400/60";
+  return "border-l-violet-400/50";
+}
+
+function BriefingBody({
+  onEnterLive,
+  onProjects,
+  onComms,
+}: {
+  onEnterLive: () => void;
+  onProjects: () => void;
+  onComms: () => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const showResume = Boolean(site.resumeUrl && site.resumeUrl !== "#");
+
   return (
     <>
-      <p className="mb-3 text-gray-400 italic opacity-80">{site.summary}</p>
-      <p className="text-gray-400 text-sm">
+      <p className="mb-2 text-sky-100/90 text-sm font-medium leading-snug">
+        {site.tagline}
+      </p>
+      <p
+        className={`mb-2 text-gray-400 text-sm leading-relaxed ${
+          expanded ? "" : "line-clamp-3"
+        }`}
+      >
+        {site.summary}
+      </p>
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        className="text-[11px] text-sky-300/90 hover:text-sky-200 mb-3 font-semibold"
+      >
+        {expanded ? "Show less" : "Read more"}
+      </button>
+      <p className="text-gray-400 text-sm mb-3">
         {site.location}
         {site.openToWork && (
           <span className="ml-2 not-italic text-emerald-400">
@@ -49,8 +82,43 @@ function BriefingBody() {
           </span>
         )}
       </p>
+
+      <div className="flex flex-wrap gap-2 mb-4">
+        <button
+          type="button"
+          onClick={onEnterLive}
+          className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-custom-blue text-white tap-target focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400"
+        >
+          Enter Live demo
+        </button>
+        <button
+          type="button"
+          onClick={onProjects}
+          className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold border border-white/15 text-white hover:border-sky-300 tap-target"
+        >
+          Projects
+        </button>
+        {showResume && (
+          <a
+            href={site.resumeUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold border border-white/15 text-white hover:border-sky-300 hover:text-sky-300 tap-target"
+          >
+            Resume
+          </a>
+        )}
+        <button
+          type="button"
+          onClick={onComms}
+          className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold border border-white/15 text-gray-300 hover:border-sky-300 hover:text-sky-200 tap-target"
+        >
+          Comms
+        </button>
+      </div>
+
       {site.skills.length > 0 && (
-        <div className="mt-4 flex flex-wrap gap-1">
+        <div className="mt-1 flex flex-wrap gap-1">
           {site.skills.map((s) => (
             <Chip key={s}>{s}</Chip>
           ))}
@@ -83,7 +151,7 @@ function ProjectMedia({ p }: { p: Project }) {
 
   return (
     <div
-      className={`relative mb-2 w-full overflow-hidden rounded-lg border border-white/10 aspect-[16/9] bg-gradient-to-br ${gradient}`}
+      className={`relative mb-2 w-full overflow-hidden rounded-lg border border-white/10 aspect-[16/9] bg-gradient-to-br ${gradient} group`}
     >
       {src ? (
         <img
@@ -91,7 +159,7 @@ function ProjectMedia({ p }: { p: Project }) {
           alt=""
           loading="lazy"
           decoding="async"
-          className="absolute inset-0 h-full w-full object-cover object-top"
+          className="absolute inset-0 h-full w-full object-cover object-top transition-transform duration-300 ease-out group-hover:scale-[1.04]"
         />
       ) : (
         <div className="absolute inset-0 flex items-center justify-center px-3">
@@ -118,19 +186,15 @@ function ProjectCard({
   const openUrl = p.liveUrl && p.liveUrl !== "#" ? p.liveUrl : null;
   const repoUrl = p.githubUrl && p.githubUrl !== "#" ? p.githubUrl : null;
 
-  /**
-   * Link policy:
-   * - live: live + repo active
-   * - in-progress: both inactive (WIP — don’t send visitors to half-built URLs)
-   * - launching-soon: live inactive; repo active if present (code often public before launch)
-   */
   const inProgress = p.status === "in-progress";
   const liveReady = p.status === "live";
   const liveClickable = liveReady && Boolean(openUrl);
   const repoClickable = !inProgress && Boolean(repoUrl);
 
   return (
-    <div className="mb-4 last:mb-0 pb-3 last:pb-0 border-b border-white/5 last:border-0">
+    <div
+      className={`mb-4 last:mb-0 pb-3 last:pb-0 border-b border-white/5 last:border-0 border-l-2 pl-2.5 -ml-0.5 ${statusBorder(p.status)}`}
+    >
       <ProjectMedia p={p} />
       <h3 className="text-white text-base font-semibold mb-1 flex flex-wrap items-center gap-1">
         <span>{p.name}</span>
@@ -158,13 +222,12 @@ function ProjectCard({
           <button
             type="button"
             onClick={onEnterLive}
-            className="text-sm font-semibold text-sky-300 hover:text-sky-200"
+            className="text-sm font-semibold text-sky-300 hover:text-sky-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400 rounded"
           >
-            Enter live system →
+            Open Live demo →
           </button>
         )}
 
-        {/* External live demo */}
         {!p.enterMissionLive && liveClickable && openUrl && (
           <a
             href={openUrl}
@@ -189,7 +252,6 @@ function ProjectCard({
           <InactiveLink label="Live soon" reason="No public demo URL yet" />
         )}
 
-        {/* Repo */}
         {repoClickable && repoUrl && (
           <a
             href={repoUrl}
@@ -229,9 +291,13 @@ function LiveBody() {
     <>
       <p className="mb-3">
         Live NEO tools are on the{" "}
-        <strong className="text-gray-300">right rail</strong> — catalog,
-        filters, compare, Sentry, ruler, and guided tours. The canvas stays
-        full-viewport; Mission Control chrome does not cover the scene.
+        <strong className="text-gray-300">right rail</strong> (or{" "}
+        <strong className="text-gray-300">NEO tools</strong> on mobile) —
+        catalog, filters, compare, Sentry, ruler, and guided tours.
+      </p>
+      <p className="text-sm text-amber-200/80 mb-2 leading-snug rounded-md border border-amber-400/20 bg-amber-950/30 px-2 py-1.5">
+        First Live request after idle may take ~20–60s while the free API
+        wakes up.
       </p>
       <p className="text-sm text-gray-500 mb-2">
         <strong className="text-gray-400">Demo path:</strong> Guided tours →
@@ -280,15 +346,28 @@ export default function MissionDock({
 
   let title = site.name;
   let role = site.role;
-  let body: ReactNode = <BriefingBody />;
+  let body: ReactNode = (
+    <BriefingBody
+      onEnterLive={onEnterLive}
+      onProjects={() => onStepChange("projects")}
+      onComms={() => onStepChange("comms")}
+    />
+  );
   const showResume = Boolean(site.resumeUrl && site.resumeUrl !== "#");
 
   let foot: ReactNode = (
     <>
       <button
         type="button"
-        onClick={() => onStepChange("projects")}
+        onClick={onEnterLive}
         className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-custom-blue text-white"
+      >
+        Enter live system
+      </button>
+      <button
+        type="button"
+        onClick={() => onStepChange("projects")}
+        className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold border border-white/15 text-white hover:border-sky-300"
       >
         View projects
       </button>
@@ -389,7 +468,7 @@ export default function MissionDock({
         <h2 className="text-xl font-bold leading-tight text-white">{title}</h2>
         <p className="text-sm font-semibold text-sky-300 mt-1">{role}</p>
       </div>
-      <div className="px-4 py-3 overflow-y-auto flex-1 text-sm text-gray-400">
+      <div className="px-4 py-3 overflow-y-auto flex-1 text-sm text-gray-400 animate-fade-in">
         {body}
       </div>
       <div className="px-4 py-3 border-t border-white/10 flex flex-wrap gap-2 shrink-0">
