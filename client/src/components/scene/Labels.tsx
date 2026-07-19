@@ -11,16 +11,29 @@ export function DistanceLabel({
   name,
   livePos,
   systemView = true,
+  /** Softer cull for major bodies (planets); NEOs stay stricter */
+  priority = "body",
 }: {
   itemId: string;
   name: string;
   livePos: React.MutableRefObject<Map<string, THREE.Vector3>>;
   systemView?: boolean;
+  priority?: "body" | "neo";
 }) {
   const spriteRef = useRef<THREE.Sprite>(null);
   const matRef = useRef<THREE.SpriteMaterial>(null);
   const { camera } = useThree();
-  const cullDist = systemView ? 150 : 48;
+  // Outer planets stay labeled at free-cam distances; near-Earth is tighter
+  const cullDist = systemView
+    ? priority === "body"
+      ? 220
+      : 180
+    : priority === "body"
+      ? 64
+      : 52;
+  const minCamDist = priority === "body" ? 1.6 : 2.2;
+  // Was 6.5 — blocked Mercury much of the time
+  const minHelioR = priority === "body" ? 3.0 : 5.0;
   const tmpA = useMemo(() => new THREE.Vector3(), []);
   const tmpB = useMemo(() => new THREE.Vector3(), []);
 
@@ -56,21 +69,24 @@ export function DistanceLabel({
       Math.sqrt((labelWidth * 0.5) ** 2 + (h * 0.5) ** 2),
       d,
     );
+    // Gentler sun glare cull so labels don't blink off while orbiting past the limb
     const onSun = isNearSunDisc(
       labelPos,
       camera,
       tmpA,
       tmpB,
-      labelRadius * 1.25,
+      labelRadius * (priority === "body" ? 0.75 : 1.0),
+      priority === "body" ? 0.012 : 0.02,
     );
-    const visible = d < cullDist && d > 3 && !onSun && p.length() > 6.5;
+    const visible =
+      d < cullDist && d > minCamDist && !onSun && p.length() > minHelioR;
     spr.visible = visible;
     if (!visible) return;
 
     // Always positive scale — negative Y would mirror text upside-down
     spr.scale.set(Math.abs(h * aspect), Math.abs(h), 1);
     spr.center.set(0.5, 0); // anchor bottom-center above the body
-    mat.opacity = THREE.MathUtils.clamp(1.0 - d / cullDist, 0.45, 0.95);
+    mat.opacity = THREE.MathUtils.clamp(1.05 - d / cullDist, 0.55, 0.98);
   });
 
   return (
@@ -80,7 +96,8 @@ export function DistanceLabel({
         map={map}
         transparent
         alphaTest={0.12}
-        depthTest
+        // Labels read above the scene; depthTest hid names behind rings/limbs
+        depthTest={false}
         depthWrite={false}
         toneMapped={false}
         sizeAttenuation
@@ -170,7 +187,8 @@ export function SelectionLabel({
       camera,
       tmpA,
       tmpB,
-      labelRadius * 1.25,
+      labelRadius * 0.85,
+      0.014,
     );
     spr.visible = !onSun;
     if (onSun) return;
@@ -185,7 +203,7 @@ export function SelectionLabel({
         map={map}
         transparent
         alphaTest={0.12}
-        depthTest
+        depthTest={false}
         depthWrite={false}
         toneMapped={false}
         sizeAttenuation
