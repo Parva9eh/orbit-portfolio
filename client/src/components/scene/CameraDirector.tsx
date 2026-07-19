@@ -56,9 +56,21 @@ export default function CameraDirector({
   const toTarget = useRef(new THREE.Vector3());
   /** Pending near-Earth until Earth has a real live position */
   const pendingNearEarth = useRef(false);
+  /** One-shot ease back to system overview (clear selection / home). */
+  const homeFrame = useRef(false);
   const TRANSITION_SEC = 1.6;
 
   const getEarthLive = () => livePos.current.get("planet:Earth") ?? null;
+
+  useEffect(() => {
+    const onHome = () => {
+      homeFrame.current = true;
+      introDone.current = true;
+      tourAngle.current = 0.35;
+    };
+    window.addEventListener("orbit-camera-home", onHome);
+    return () => window.removeEventListener("orbit-camera-home", onHome);
+  }, []);
 
   const computeNearEarthPose = (
     outPos: THREE.Vector3,
@@ -314,6 +326,24 @@ export default function CameraDirector({
       camera.position.lerp(desired.current, 1 - Math.exp(-2.2 * dt));
       camera.lookAt(target.current);
       if (controls) controls.target.copy(target.current);
+      return;
+    }
+
+    // Home framing after clear selection — ease to system overview once
+    if (homeFrame.current) {
+      if (controls) controls.enabled = false;
+      desired.current.set(48, 52, 88);
+      target.current.lerp(origin.current, 1 - Math.exp(-2.5 * dt));
+      camera.position.lerp(desired.current, 1 - Math.exp(-2.2 * dt));
+      camera.lookAt(target.current);
+      if (controls) controls.target.copy(target.current);
+      if (camera.position.distanceTo(desired.current) < 2.5) {
+        homeFrame.current = false;
+        if (controls) {
+          controls.enabled = !issFocus;
+          controls.update();
+        }
+      }
       return;
     }
 

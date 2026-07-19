@@ -287,8 +287,6 @@ export function ActionBar({
   onCopyLink,
   copyLinkStatus = "idle",
   onClearCompare,
-  onExportSummary,
-  exportStatus = "idle",
 }: {
   isAsteroidItem: boolean;
   onToggleCompare?: () => void;
@@ -297,10 +295,10 @@ export function ActionBar({
   onCopyLink?: () => void;
   copyLinkStatus?: "idle" | "copied" | "failed";
   onClearCompare?: () => void;
-  onExportSummary?: () => void;
-  exportStatus?: "idle" | "copied" | "failed";
 }) {
-  if (!onToggleCompare && !onCopyLink && !onExportSummary) return null;
+  // Export summary removed — Copy link covers share; plain-text export was
+  // unreliable on some browsers and low-value for portfolio demos.
+  if (!onToggleCompare && !onCopyLink) return null;
 
   return (
     <div className="mt-2.5 pt-2 border-t border-white/10 space-y-1.5">
@@ -330,26 +328,13 @@ export function ActionBar({
             type="button"
             onClick={onCopyLink}
             className="text-[11px] font-semibold px-2 py-1 rounded-md border bg-white/5 text-gray-200 border-white/10 hover:bg-white/10"
+            title="Copy a shareable URL for this briefing"
           >
             {copyLinkStatus === "copied"
               ? "Link copied"
               : copyLinkStatus === "failed"
                 ? "Copy failed"
                 : "Copy link"}
-          </button>
-        )}
-        {onExportSummary && (
-          <button
-            type="button"
-            onClick={onExportSummary}
-            className="text-[11px] font-semibold px-2 py-1 rounded-md border bg-violet-500/15 text-violet-100 border-violet-400/30 hover:bg-violet-500/25"
-            title="Copy plain-text briefing for demos or sharing"
-          >
-            {exportStatus === "copied"
-              ? "Summary copied"
-              : exportStatus === "failed"
-                ? "Copy failed"
-                : "Export summary"}
           </button>
         )}
         {compareCount > 0 && onClearCompare && (

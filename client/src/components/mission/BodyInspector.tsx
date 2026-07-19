@@ -22,9 +22,6 @@ type BodyInspectorProps = {
   onCopyLink?: () => void;
   copyLinkStatus?: "idle" | "copied" | "failed";
   onClearCompare?: () => void;
-  /** P6 — plain-text export for demos */
-  onExportSummary?: () => void;
-  exportStatus?: "idle" | "copied" | "failed";
 };
 
 /**
@@ -43,8 +40,6 @@ export default function BodyInspector({
   onCopyLink,
   copyLinkStatus = "idle",
   onClearCompare,
-  onExportSummary,
-  exportStatus = "idle",
 }: BodyInspectorProps) {
   const title =
     (isAsteroid(item) && sbdb?.found && sbdb.fullname) || item.name;
@@ -75,7 +70,8 @@ export default function BodyInspector({
           type="button"
           onClick={onClear}
           className="shrink-0 text-xs font-semibold text-sky-300 hover:text-sky-200 px-1"
-          aria-label="Clear selection"
+          aria-label="Clear selection and return to system view"
+          title="Close · return to free system view"
         >
           ×
         </button>
@@ -99,8 +95,6 @@ export default function BodyInspector({
         onCopyLink={onCopyLink}
         copyLinkStatus={copyLinkStatus}
         onClearCompare={onClearCompare}
-        onExportSummary={onExportSummary}
-        exportStatus={exportStatus}
       />
     </div>
   );

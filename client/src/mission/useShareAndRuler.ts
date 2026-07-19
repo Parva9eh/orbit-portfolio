@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 import type { Dispatch } from "react";
 import type { CelestialItem, SbdbOrbitResult } from "@shared";
-import { formatExportSummary, isAsteroid } from "@shared";
+import { isAsteroid } from "@shared";
 import { isSentrySceneId } from "../lib/sentryBody";
 import { copyShareUrl, type OrbitUrlState } from "../lib/urlState";
 import type { LiveMissionAction, LiveMissionState } from "./liveMissionState";
@@ -16,13 +16,12 @@ export type ShareAndRulerArgs = {
 };
 
 /**
- * Copy share link, export summary, and ruler quick-picks (vs Earth / Sun).
+ * Copy share link and ruler quick-picks (vs Earth / Sun).
  */
 export function useShareAndRuler({
   live,
   dispatchLive,
   displaySelected,
-  sbdb,
   viewScale,
 }: ShareAndRulerArgs) {
   const {
@@ -37,35 +36,6 @@ export function useShareAndRuler({
   const [copyLinkStatus, setCopyLinkStatus] = useState<
     "idle" | "copied" | "failed"
   >("idle");
-  const [exportStatus, setExportStatus] = useState<
-    "idle" | "copied" | "failed"
-  >("idle");
-
-  const handleExportSummary = useCallback(async () => {
-    if (!displaySelected || !isAsteroid(displaySelected)) return;
-    const a = displaySelected;
-    const text = formatExportSummary({
-      name: a.name,
-      designation: a.designation,
-      isHazardous: a.isHazardous,
-      approach: a.approach,
-      diameterKmMin: a.diameterKmMin,
-      diameterKmMax: a.diameterKmMax,
-      sizeKm: a.size,
-      orbitSource: a.orbitSource,
-      e: a.orbit.eccentricity,
-      iDeg: (a.orbit.inclination * 180) / Math.PI,
-      periodYears: a.orbit.periodYears,
-      aAu: sbdb?.found ? sbdb.aAu : undefined,
-    });
-    try {
-      await navigator.clipboard.writeText(text);
-      setExportStatus("copied");
-    } catch {
-      setExportStatus("failed");
-    }
-    window.setTimeout(() => setExportStatus("idle"), 2000);
-  }, [displaySelected, sbdb]);
 
   const handleRulerVsEarth = useCallback(() => {
     if (!displaySelected || !isAsteroid(displaySelected)) return;
@@ -134,8 +104,6 @@ export function useShareAndRuler({
 
   return {
     copyLinkStatus,
-    exportStatus,
-    handleExportSummary,
     handleRulerVsEarth,
     handleRulerVsSun,
     handleCopyLink,
