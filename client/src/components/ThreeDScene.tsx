@@ -28,7 +28,7 @@ import Sun from "./scene/Sun";
 import OrbitLine from "./scene/OrbitLine";
 import EarthBody from "./scene/Earth";
 import PlanetBody from "./scene/PlanetBody";
-import { OrbitProgressMarker, MotionTrail } from "./scene/MotionTrail";
+import { OrbitProgressMarker } from "./scene/MotionTrail";
 import AsteroidBelt from "./scene/AsteroidBelt";
 import NeoInstances from "./scene/NeoInstances";
 import SceneLabels from "./scene/SceneLabels";
@@ -286,9 +286,11 @@ const ThreeDScene = React.memo(function ThreeDScene({
           <OrbitProgressMarker orbit={selectedItem.orbit} color="#d0e8ff" />
         )}
 
-      {selectedItem && isAsteroid(selectedItem) && (
-        <MotionTrail livePos={livePos} itemId={selectedItem.id} />
-      )}
+      {/*
+        Selected NEO: one OrbitLine only (selectedAsteroidOrbit above).
+        MotionTrail was a short “breadcrumb” history that looked like a second
+        orbit and confused selection — removed on purpose.
+      */}
 
       <SceneLabels
         showLabels={showLabels}
