@@ -20,7 +20,10 @@ export type SimSettings = {
   timeScale: TimeScalePreset;
   trueScale: boolean;
   showLabels: boolean;
+  /** Ambient loop — off by default (autoplay + preference). */
   audioEnabled: boolean;
+  /** UI click SFX — on by default, independent of music. */
+  sfxEnabled: boolean;
   cameraMode: CameraMode;
   quality: QualityPreset;
   viewScale: ViewScale;
@@ -32,6 +35,7 @@ export type SimActions = {
   setTrueScale: (v: boolean) => void;
   setShowLabels: (v: boolean) => void;
   setAudioEnabled: (v: boolean) => void;
+  setSfxEnabled: (v: boolean) => void;
   setCameraMode: (m: CameraMode) => void;
   setQuality: (q: QualityPreset) => void;
   setViewScale: (v: ViewScale) => void;
@@ -46,6 +50,8 @@ export function SimProvider({ children }: { children: ReactNode }) {
   const [trueScale, setTrueScale] = useState(false);
   const [showLabels, setShowLabels] = useState(true);
   const [audioEnabled, setAudioEnabled] = useState(false);
+  /** Click cues on by default; ambient music stays opt-in via audioEnabled */
+  const [sfxEnabled, setSfxEnabled] = useState(true);
   /** Default Free so users can orbit immediately; Tour/Focus are opt-in */
   const [cameraMode, setCameraMode] = useState<CameraMode>("free");
   const [quality, setQuality] = useState<QualityPreset>("cinematic");
@@ -67,6 +73,7 @@ export function SimProvider({ children }: { children: ReactNode }) {
       trueScale,
       showLabels,
       audioEnabled,
+      sfxEnabled,
       cameraMode,
       quality,
       viewScale,
@@ -76,6 +83,7 @@ export function SimProvider({ children }: { children: ReactNode }) {
       trueScale,
       showLabels,
       audioEnabled,
+      sfxEnabled,
       cameraMode,
       quality,
       viewScale,
@@ -89,6 +97,7 @@ export function SimProvider({ children }: { children: ReactNode }) {
       setTrueScale,
       setShowLabels,
       setAudioEnabled,
+      setSfxEnabled,
       setCameraMode,
       setQuality,
       setViewScale,
