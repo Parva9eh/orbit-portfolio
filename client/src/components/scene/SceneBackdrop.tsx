@@ -1,17 +1,18 @@
-import { useEffect } from "react";
+import { useLayoutEffect } from "react";
 import { useThree } from "@react-three/fiber";
 import * as THREE from "three";
 
-/** Immediate dark clear — runs outside Suspense so first paint is never light-blue. */
+const CLEAR = "#010308";
+
+/** Dark clear + subtle fog. Always solid dark — no sky plate fight. */
 export function SceneBackdrop() {
-  const { gl } = useThree();
-  useEffect(() => {
-    gl.setClearColor(new THREE.Color("#010308"), 1);
-  }, [gl]);
-  return (
-    <>
-      <color attach="background" args={["#010308"]} />
-      <fog attach="fog" args={["#010308", 220, 620]} />
-    </>
-  );
+  const { gl, scene } = useThree();
+
+  useLayoutEffect(() => {
+    const c = new THREE.Color(CLEAR);
+    gl.setClearColor(c, 1);
+    scene.background = c;
+  }, [gl, scene]);
+
+  return <fog attach="fog" args={[CLEAR, 180, 560]} />;
 }
