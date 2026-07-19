@@ -63,7 +63,10 @@ export function preloadTextures(urls: string[], srgb = true): void {
  * Outer planets are deferred until System view / visible bodies warm-up.
  */
 export function preloadBootTextures(): void {
-  preloadTextures([EXTRA_MAPS.sun, EXTRA_MAPS.milkyWay], true);
+  preloadTextures(
+    [EXTRA_MAPS.sun, EXTRA_MAPS.milkyWayDisplay, EXTRA_MAPS.milkyWay],
+    true
+  );
 }
 
 /**
@@ -130,5 +133,11 @@ export const EXTRA_MAPS = {
   saturnRing: `${SSS}/2k_saturn_ring_alpha.png`,
   moon: `${SSS}/2k_moon.jpg`,
   sun: `${SSS}/2k_sun.jpg`,
+  /** Raw SSS plate (near-black) — prefer milkyWayDisplay for sky */
   milkyWay: `${SSS}/2k_stars_milky_way.jpg`,
+  /**
+   * Offline-boosted plate for skydome (mean ~38/255, capped so voids stay dark).
+   * Built from 2k_stars_milky_way.jpg — do not use raw plate with mild GPU gain.
+   */
+  milkyWayDisplay: `${SSS}/2k_stars_milky_way_display.jpg`,
 };
