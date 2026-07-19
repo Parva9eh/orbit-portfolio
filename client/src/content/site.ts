@@ -42,7 +42,7 @@ export type SiteContent = {
 
 export const site: SiteContent = {
   brand: "ORBIT",
-  name: "Parvaneh",
+  name: "Parvaneh Z.",
   role: "Full-Stack Software Developer · Creative Tech",
   tagline:
     "End-to-end web products — React/Next UIs, Node & Python APIs, real data, and interactive 3D.",
