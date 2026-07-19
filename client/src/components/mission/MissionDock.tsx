@@ -43,17 +43,8 @@ function statusBorder(status: ProjectStatus): string {
   return "border-l-violet-400/50";
 }
 
-function BriefingBody({
-  onEnterLive,
-  onProjects,
-  onComms,
-}: {
-  onEnterLive: () => void;
-  onProjects: () => void;
-  onComms: () => void;
-}) {
+function BriefingBody() {
   const [expanded, setExpanded] = useState(false);
-  const showResume = Boolean(site.resumeUrl && site.resumeUrl !== "#");
 
   return (
     <>
@@ -82,40 +73,6 @@ function BriefingBody({
           </span>
         )}
       </p>
-
-      <div className="flex flex-wrap gap-2 mb-4">
-        <button
-          type="button"
-          onClick={onEnterLive}
-          className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-custom-blue text-white tap-target focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400"
-        >
-          Enter Live demo
-        </button>
-        <button
-          type="button"
-          onClick={onProjects}
-          className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold border border-white/15 text-white hover:border-sky-300 tap-target"
-        >
-          Projects
-        </button>
-        {showResume && (
-          <a
-            href={site.resumeUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold border border-white/15 text-white hover:border-sky-300 hover:text-sky-300 tap-target"
-          >
-            Resume
-          </a>
-        )}
-        <button
-          type="button"
-          onClick={onComms}
-          className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold border border-white/15 text-gray-300 hover:border-sky-300 hover:text-sky-200 tap-target"
-        >
-          Comms
-        </button>
-      </div>
 
       {site.skills.length > 0 && (
         <div className="mt-1 flex flex-wrap gap-1">
@@ -346,13 +303,7 @@ export default function MissionDock({
 
   let title = site.name;
   let role = site.role;
-  let body: ReactNode = (
-    <BriefingBody
-      onEnterLive={onEnterLive}
-      onProjects={() => onStepChange("projects")}
-      onComms={() => onStepChange("comms")}
-    />
-  );
+  let body: ReactNode = <BriefingBody />;
   const showResume = Boolean(site.resumeUrl && site.resumeUrl !== "#");
 
   let foot: ReactNode = (
@@ -446,20 +397,30 @@ export default function MissionDock({
     );
   }
 
+  /** Story steps: use more vertical space; Live stays compact so the canvas reads. */
+  const storyTall = step !== "live";
+
   return (
     <aside
       className={
         landscape
           ? `absolute z-20 flex flex-col overflow-hidden rounded-xl border border-white/10 bg-[#0f1623]/cc backdrop-blur-md shadow-2xl
               left-2 top-14 bottom-12 w-[min(46vw,22rem)] max-h-none safe-pad-x`
-          : `absolute z-20 flex flex-col overflow-hidden rounded-xl border border-white/10 bg-[#0f1623]/cc backdrop-blur-md shadow-2xl
-              left-3 right-3 bottom-12 max-h-[min(42vh,22rem)]
-              max-md:max-h-[min(38dvh,18rem)]
-              safe-pad-x
-              md:left-4 md:right-auto md:top-16 md:bottom-14 md:w-[min(360px,92vw)] md:max-h-none`
+          : storyTall
+            ? `absolute z-20 flex flex-col overflow-hidden rounded-xl border border-white/10 bg-[#0f1623]/cc backdrop-blur-md shadow-2xl
+                left-3 right-3 top-14 bottom-12
+                max-md:top-[3.5rem] max-md:bottom-11
+                safe-pad-x
+                md:left-4 md:right-auto md:top-16 md:bottom-14 md:w-[min(360px,92vw)]`
+            : `absolute z-20 flex flex-col overflow-hidden rounded-xl border border-white/10 bg-[#0f1623]/cc backdrop-blur-md shadow-2xl
+                left-3 right-3 bottom-12 max-h-[min(28vh,12rem)]
+                max-md:max-h-[min(26dvh,11rem)]
+                safe-pad-x
+                md:left-4 md:right-auto md:top-16 md:bottom-14 md:w-[min(360px,92vw)] md:max-h-none`
       }
       aria-live="polite"
       data-landscape={landscape ? "true" : "false"}
+      data-step={step}
     >
       <div className="px-4 pt-4 pb-3 border-b border-white/10 shrink-0">
         <p className="text-[0.65rem] tracking-[0.14em] uppercase text-cyan-300 font-semibold mb-1">
