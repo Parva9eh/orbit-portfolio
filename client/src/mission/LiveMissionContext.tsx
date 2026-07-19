@@ -70,9 +70,6 @@ export type LiveMissionTools = {
   onSentryLookupSbdb: () => void;
   sentrySbdbHint: string | null;
 
-  onExportSummary: () => void;
-  exportStatus: "idle" | "copied" | "failed";
-
   rulerApproachMiss: string | null;
   onRulerVsEarth: () => void;
   onRulerVsSun: () => void;

@@ -1,7 +1,7 @@
-import { useEffect, useMemo, Suspense, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, Suspense, type ReactNode } from "react";
 import { Canvas } from "@react-three/fiber";
 import type { CelestialItem } from "@shared";
-import { isAsteroid } from "@shared";
+import { formatMiss, isAsteroid, isPlanet } from "@shared";
 import ThreeDScene from "../components/ThreeDScene";
 import type { MissionStepId } from "../content/site";
 import type { LiveMissionTools } from "./LiveMissionContext";
@@ -37,6 +37,8 @@ export type MissionControlModel = {
       loading: boolean;
       error: Error | null;
       selectedItem: CelestialItem | null;
+      /** Desktop hover chip (null when not hovering) */
+      hoverTip: { text: string; kind: "planet" | "neo" | "pha" } | null;
       iss: import("@shared").IssPosition | null;
       showIss: boolean;
       issFocus: boolean;
@@ -156,7 +158,6 @@ export function useMissionControlModel(): MissionControlModel {
     sentryBriefSummary,
     sbdbHint,
     sentrySceneBody,
-    exportStatus,
     sentryDetail,
     sentryDetailLoading,
     sentryDetailError,
@@ -175,12 +176,41 @@ export function useMissionControlModel(): MissionControlModel {
     handleShowIssChange,
     handleIssFocusChange,
     handleShowSentryChange,
-    handleExportSummary,
     handleGuidedTour,
     handleRulerVsEarth,
     handleRulerVsSun,
     handleCopyLink,
   } = handlers;
+
+  const [hoverItem, setHoverItem] = useState<CelestialItem | null>(null);
+
+  const handleItemHover = useCallback((item: CelestialItem | null) => {
+    setHoverItem(item);
+  }, []);
+
+  const hoverTip = useMemo(() => {
+    if (!hoverItem) return null;
+    if (displaySelected && hoverItem.id === displaySelected.id) return null;
+    if (isAsteroid(hoverItem)) {
+      const miss = hoverItem.approach
+        ? formatMiss(hoverItem.approach.missLd, hoverItem.approach.missKm, {
+            compact: true,
+          })
+        : null;
+      const pha = hoverItem.isHazardous;
+      const text = miss
+        ? `${hoverItem.name} · miss ${miss}${pha ? " · PHA" : ""}`
+        : `${hoverItem.name}${pha ? " · PHA" : ""}`;
+      return { text, kind: pha ? ("pha" as const) : ("neo" as const) };
+    }
+    if (isPlanet(hoverItem)) {
+      return {
+        text: `${hoverItem.name} · planet · click to focus`,
+        kind: "planet" as const,
+      };
+    }
+    return null;
+  }, [hoverItem, displaySelected]);
 
   const rulerApproachMiss = useMemo(
     () =>
@@ -315,8 +345,6 @@ export function useMissionControlModel(): MissionControlModel {
       onDismissSentryBrief: handleDismissSentryBrief,
       onSentryLookupSbdb: handleSentryLookupSbdb,
       sentrySbdbHint: sbdbHint,
-      onExportSummary: handleExportSummary,
-      exportStatus,
       rulerApproachMiss: rulerApproachMiss ?? null,
       onRulerVsEarth: handleRulerVsEarth,
       onRulerVsSun: handleRulerVsSun,
@@ -369,8 +397,6 @@ export function useMissionControlModel(): MissionControlModel {
       handleDismissSentryBrief,
       handleSentryLookupSbdb,
       sbdbHint,
-      handleExportSummary,
-      exportStatus,
       rulerApproachMiss,
       handleRulerVsEarth,
       handleRulerVsSun,
@@ -393,10 +419,15 @@ export function useMissionControlModel(): MissionControlModel {
           alpha: false,
           preserveDrawingBuffer: true,
         }}
-        onCreated={({ gl }) => {
-          gl.setClearColor("#010308", 1);
+        onCreated={({ gl, scene }) => {
+          // Sync first paint — avoid white/default clear before SceneBackdrop
+          const c = "#010308";
+          gl.setClearColor(c, 1);
+          scene.background = null; // SceneBackdrop owns background color
+          gl.setClearColor(c, 1);
         }}
         className="!absolute inset-0 bg-[#010308]"
+        style={{ background: "#010308" }}
       >
         <SceneBackdrop />
         <SimTicker />
@@ -405,6 +436,7 @@ export function useMissionControlModel(): MissionControlModel {
           <ThreeDScene
             items={sceneItems}
             onItemClick={handleItemClick}
+            onItemHover={handleItemHover}
             selectedItem={displaySelected}
             showPlanets={showPlanets}
             planetsData={planetsData?.data ?? []}
@@ -457,6 +489,7 @@ export function useMissionControlModel(): MissionControlModel {
         loading,
         error,
         selectedItem: displaySelected,
+        hoverTip,
         iss: iss ?? null,
         showIss: showIss && mode === "live",
         issFocus,
