@@ -96,11 +96,13 @@ export default function EarthBody({
   planet,
   livePos,
   onClick,
+  onHover,
   selected,
 }: {
   planet: Planet;
   livePos: React.MutableRefObject<Map<string, THREE.Vector3>>;
   onClick: () => void;
+  onHover?: (active: boolean) => void;
   selected: boolean;
 }) {
   const groupRef = useRef<THREE.Group>(null);
@@ -168,6 +170,15 @@ export default function EarthBody({
       onClick={(e) => {
         e.stopPropagation();
         onClick();
+      }}
+      onPointerOver={(e) => {
+        e.stopPropagation();
+        document.body.style.cursor = "pointer";
+        onHover?.(true);
+      }}
+      onPointerOut={() => {
+        document.body.style.cursor = "auto";
+        onHover?.(false);
       }}
     >
       <mesh ref={bodyRef} scale={displaySize}>

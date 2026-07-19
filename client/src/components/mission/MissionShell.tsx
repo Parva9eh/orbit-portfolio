@@ -22,6 +22,7 @@ type MissionShellProps = {
     loading: boolean;
     error: Error | null;
     selectedItem: CelestialItem | null;
+    hoverTip?: { text: string; kind: "planet" | "neo" | "pha" } | null;
     iss: IssPosition | null;
     showIss: boolean;
     issFocus: boolean;
@@ -65,14 +66,36 @@ export default function MissionShell({
     "(max-width: 1024px) and (orientation: landscape)",
     false
   );
+  const fineHover = useMediaQuery("(hover: hover) and (pointer: fine)", false);
   const mobileChrome = narrow || landscape;
   const waking = useSlowLoading(status.loading, 3000);
+  const isLiveStep = liveToolsOpen || step === "live";
 
-  // Viz: collapsed by default on phone portrait; open on desktop / when leaving narrow
+  // Track pointer so the hover chip sits near the cursor (not stranded under the bar)
+  const [pointer, setPointer] = useState({ x: 0, y: 0 });
+  useEffect(() => {
+    if (!fineHover) return;
+    const onMove = (e: PointerEvent) => {
+      setPointer({ x: e.clientX, y: e.clientY });
+    };
+    window.addEventListener("pointermove", onMove, { passive: true });
+    return () => window.removeEventListener("pointermove", onMove);
+  }, [fineHover]);
+
+  const hoverTip = status.hoverTip ?? null;
+  const hoverTone =
+    hoverTip?.kind === "pha"
+      ? "border-red-400/55 bg-red-950/90 text-red-100 shadow-[0_0_16px_rgba(248,113,113,0.35)]"
+      : hoverTip?.kind === "neo"
+        ? "border-cyan-400/50 bg-cyan-950/90 text-cyan-50 shadow-[0_0_16px_rgba(34,211,238,0.28)]"
+        : "border-sky-400/50 bg-sky-950/90 text-sky-50 shadow-[0_0_16px_rgba(56,189,248,0.3)]";
+
+  // Viz: desktop open by default; mobile only on Live and collapsed until toggled
   const [vizOpen, setVizOpen] = useState(() => !narrow);
   useEffect(() => {
     if (!narrow && !landscape) setVizOpen(true);
-  }, [narrow, landscape]);
+    else if (!isLiveStep) setVizOpen(false);
+  }, [narrow, landscape, isLiveStep]);
 
   // Live tools: collapsed by default on mobile so canvas is first paint
   const [liveOpenMobile, setLiveOpenMobile] = useState(false);
@@ -81,8 +104,10 @@ export default function MissionShell({
   }, [liveToolsOpen]);
 
   const showLivePanel = liveToolsOpen && (!mobileChrome || liveOpenMobile);
+  // Mobile Live FABs only on step Live — not over story/project links
+  const showMobileLiveToggles = mobileChrome && isLiveStep;
 
-  // Esc closes mobile Live sheet (selection clear is handled in LiveNeoPanel)
+  // Esc closes mobile Live sheet
   useEffect(() => {
     if (!liveOpenMobile || !mobileChrome) return;
     const onKey = (e: KeyboardEvent) => {
@@ -101,6 +126,7 @@ export default function MissionShell({
     <div
       className="relative h-[100dvh] w-full max-h-[100dvh] overflow-hidden bg-[#070b12] text-white touch-manipulation"
       data-layout={landscape ? "landscape" : narrow ? "narrow" : "desktop"}
+      data-step={step}
     >
       <div className="absolute inset-0 bg-black">{canvas}</div>
 
@@ -112,7 +138,38 @@ export default function MissionShell({
         onModeChange={onModeChange}
       />
 
-      {/* Hide story dock when mobile Live sheet is open so sheet can use height */}
+      {/* Desktop hover chip — follows cursor, colored by body kind */}
+      {fineHover && hoverTip && (
+        <div
+          className={`fixed z-50 pointer-events-none max-w-[min(90vw,20rem)] px-3 py-1.5 rounded-lg border backdrop-blur-md text-[11px] font-semibold tracking-wide truncate animate-fade-in ${hoverTone}`}
+          style={{
+            left: Math.min(
+              typeof window !== "undefined" ? window.innerWidth - 16 : 0,
+              pointer.x + 14
+            ),
+            top: Math.min(
+              typeof window !== "undefined" ? window.innerHeight - 40 : 0,
+              pointer.y + 18
+            ),
+            transform: "translate(0, 0)",
+          }}
+          role="status"
+        >
+          <span
+            className={`inline-block w-1.5 h-1.5 rounded-full mr-1.5 align-middle ${
+              hoverTip.kind === "pha"
+                ? "bg-red-400 shadow-[0_0_6px_#f87171]"
+                : hoverTip.kind === "neo"
+                  ? "bg-cyan-300 shadow-[0_0_6px_#67e8f9]"
+                  : "bg-sky-300 shadow-[0_0_6px_#7dd3fc]"
+            }`}
+            aria-hidden
+          />
+          {hoverTip.text}
+        </div>
+      )}
+
+      {/* Hide story dock when mobile Live sheet is open */}
       {!(narrow && showLivePanel && !landscape) && (
         <MissionDock
           step={step}
@@ -122,24 +179,25 @@ export default function MissionShell({
         />
       )}
 
-      {/* Mobile / landscape: quick toggles */}
-      {mobileChrome && (
+      {/*
+        Mobile Live-only toggles: top-right under header (not over dock footers).
+        Open tools → inspect → hide to reveal the scene result.
+      */}
+      {showMobileLiveToggles && (
         <div
-          className={`absolute z-40 pointer-events-auto flex gap-1.5 safe-pad-b
+          className={`absolute z-40 pointer-events-auto flex gap-1.5 safe-pad-x
             ${
               landscape
                 ? "right-3 top-1/2 -translate-y-1/2 flex-col"
-                : showLivePanel
-                  ? "left-1/2 -translate-x-1/2 bottom-[min(58dvh,28rem)]"
-                  : "left-1/2 -translate-x-1/2 bottom-[3.25rem]"
+                : "right-3 top-[3.55rem] flex-row"
             }`}
         >
           {liveToolsOpen && (
             <button
               type="button"
               onClick={() => setLiveOpenMobile((v) => !v)}
-              className="text-[11px] font-semibold px-3 py-1.5 rounded-full border border-white/15
-                bg-black/70 backdrop-blur-md text-sky-200 tap-target shadow-lg whitespace-nowrap
+              className="text-[11px] font-semibold px-2.5 py-1.5 rounded-full border border-white/15
+                bg-black/75 backdrop-blur-md text-sky-200 tap-target shadow-lg whitespace-nowrap
                 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400"
               aria-pressed={liveOpenMobile}
               aria-label={liveOpenMobile ? "Hide NEO tools" : "Show NEO tools"}
@@ -150,8 +208,8 @@ export default function MissionShell({
           <button
             type="button"
             onClick={() => setVizOpen((v) => !v)}
-            className="text-[11px] font-semibold px-3 py-1.5 rounded-full border border-white/15
-              bg-black/70 backdrop-blur-md text-cyan-200 tap-target shadow-lg
+            className="text-[11px] font-semibold px-2.5 py-1.5 rounded-full border border-white/15
+              bg-black/75 backdrop-blur-md text-cyan-200 tap-target shadow-lg
               focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400"
             aria-pressed={vizOpen}
           >
@@ -162,8 +220,8 @@ export default function MissionShell({
 
       {/*
         Chrome stack:
-        - Portrait mobile: Live Neo as bottom sheet
-        - Landscape: Live tools from the right
+        - Portrait mobile Live: bottom sheet
+        - Landscape: tools from the right
         - Desktop: right rail
       */}
       <div
@@ -191,7 +249,7 @@ export default function MissionShell({
             />
             <div
               className="absolute left-0 right-0 bottom-0 z-10 pointer-events-auto
-                h-[min(58dvh,28rem)] max-h-[calc(100dvh-5.5rem)]
+                h-[min(62dvh,30rem)] max-h-[calc(100dvh-5rem)]
                 safe-pad-x safe-pad-b
                 px-2 pb-2 pt-0
                 animate-fade-in"
@@ -217,37 +275,35 @@ export default function MissionShell({
               landscape
                 ? "pointer-events-auto flex-1 min-h-0 rounded-xl overflow-hidden shadow-2xl"
                 : `pointer-events-auto
-                    absolute left-3 right-3
-                    bottom-[calc(min(42vh,20rem)+4.5rem)]
-                    h-[min(32vh,calc(100dvh-16rem))]
-                    max-md:max-h-[min(34dvh,280px)]
-                    md:static md:left-auto md:right-auto md:bottom-auto md:h-auto
-                    md:flex-1 md:min-h-0 md:max-h-none`
+                    md:static md:flex-1 md:min-h-0 md:max-h-none`
             }
           >
             <LiveNeoPanel embedded />
           </div>
         )}
 
-        {(vizOpen || !mobileChrome) && !(narrow && showLivePanel && !landscape) && (
-          <div
-            className={
-              landscape
-                ? "pointer-events-auto shrink-0"
-                : `pointer-events-auto
-                    absolute bottom-[3.25rem] left-1/2 -translate-x-1/2 max-w-[min(92vw,300px)]
-                    md:static md:translate-x-0 md:left-auto md:bottom-auto md:max-w-none md:shrink-0
-                    ${liveToolsOpen ? "" : "md:mt-auto md:self-end md:w-[min(300px,90vw)]"}
-                    max-md:mb-8`
-            }
-          >
-            <VizControls
-              embedded
-              compact={mobileChrome}
-              onScreenshot={captureCanvasScreenshot}
-            />
-          </div>
-        )}
+        {/* Viz: desktop always available; mobile only when toggled on Live */}
+        {(vizOpen || !mobileChrome) &&
+          !(narrow && showLivePanel && !landscape) &&
+          (!mobileChrome || isLiveStep) && (
+            <div
+              className={
+                landscape
+                  ? "pointer-events-auto shrink-0"
+                  : mobileChrome
+                    ? `pointer-events-auto absolute right-3 top-[6.25rem] max-w-[min(92vw,280px)]`
+                    : `pointer-events-auto
+                        md:static md:translate-x-0 md:max-w-none md:shrink-0
+                        ${liveToolsOpen ? "" : "md:mt-auto md:self-end md:w-[min(300px,90vw)]"}`
+              }
+            >
+              <VizControls
+                embedded
+                compact={mobileChrome}
+                onScreenshot={captureCanvasScreenshot}
+              />
+            </div>
+          )}
       </div>
 
       {landscape && showLivePanel && (

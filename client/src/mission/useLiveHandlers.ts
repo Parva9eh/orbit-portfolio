@@ -157,6 +157,25 @@ export function useLiveHandlers(args: LiveHandlersArgs) {
     ]
   );
 
+  /** Free camera + system overview framing (clear Inspect / leave ISS·Sentry). */
+  const restoreSystemHome = useCallback(() => {
+    setCameraMode("free");
+    setViewScale("system");
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("orbit-camera-home"));
+    }
+  }, [setCameraMode, setViewScale]);
+
+  /**
+   * Close Inspect: drop selection, free the camera, return to system overview.
+   * Better than leaving Focus mode stuck at the last dolly pose.
+   */
+  const handleClearSelectionHome = useCallback(() => {
+    handleClearSelection();
+    dispatchLive({ type: "SET_ISS_FOCUS", value: false });
+    restoreSystemHome();
+  }, [handleClearSelection, dispatchLive, restoreSystemHome]);
+
   const handleSelectDate = useCallback(
     (iso: string) => {
       dispatchLive({ type: "SET_DATE", date: iso });
@@ -214,10 +233,14 @@ export function useLiveHandlers(args: LiveHandlersArgs) {
   const handleShowIssChange = useCallback(
     (v: boolean) => {
       dispatchLive({ type: "SET_ISS", show: v });
-      if (!v) dispatchLive({ type: "SET_ISS_FOCUS", value: false });
-      else setViewScale("nearEarth");
+      if (!v) {
+        dispatchLive({ type: "SET_ISS_FOCUS", value: false });
+        restoreSystemHome();
+      } else {
+        setViewScale("nearEarth");
+      }
     },
-    [setViewScale, dispatchLive]
+    [setViewScale, dispatchLive, restoreSystemHome]
   );
 
   const handleIssFocusChange = useCallback(
@@ -229,6 +252,13 @@ export function useLiveHandlers(args: LiveHandlersArgs) {
         setCameraMode("tour");
         setSelectedItem(null);
         wipeSentryForIssFocus();
+      } else {
+        // Leave tight ISS framing; if ISS layer is still on stay near-Earth free,
+        // otherwise return to system home.
+        setCameraMode("free");
+        if (!live.showIss) {
+          restoreSystemHome();
+        }
       }
     },
     [
@@ -237,8 +267,26 @@ export function useLiveHandlers(args: LiveHandlersArgs) {
       dispatchLive,
       setSelectedItem,
       wipeSentryForIssFocus,
+      live.showIss,
+      restoreSystemHome,
     ]
   );
+
+  const handleShowSentryChangeHome = useCallback(
+    (v: boolean) => {
+      handleShowSentryChange(v);
+      if (!v) {
+        dispatchLive({ type: "SET_ISS_FOCUS", value: false });
+        restoreSystemHome();
+      }
+    },
+    [handleShowSentryChange, dispatchLive, restoreSystemHome]
+  );
+
+  const handleDismissSentryBriefHome = useCallback(() => {
+    handleDismissSentryBrief();
+    restoreSystemHome();
+  }, [handleDismissSentryBrief, restoreSystemHome]);
 
   const { handleGuidedTour } = useGuidedTour({
     dispatchLive,
@@ -260,7 +308,6 @@ export function useLiveHandlers(args: LiveHandlersArgs) {
     sentryBriefSummary,
     sbdbHint,
     sentrySceneBody,
-    exportStatus: share.exportStatus,
     sentryDetail,
     sentryDetailLoading,
     sentryDetailError,
@@ -273,13 +320,12 @@ export function useLiveHandlers(args: LiveHandlersArgs) {
     handleClearCompare,
     handleRemoveCompare,
     handleSentryPickDes,
-    handleDismissSentryBrief,
-    handleClearSelection,
+    handleDismissSentryBrief: handleDismissSentryBriefHome,
+    handleClearSelection: handleClearSelectionHome,
     handleSentryLookupSbdb,
     handleShowIssChange,
     handleIssFocusChange,
-    handleShowSentryChange,
-    handleExportSummary: share.handleExportSummary,
+    handleShowSentryChange: handleShowSentryChangeHome,
     handleGuidedTour,
     handleRulerVsEarth: share.handleRulerVsEarth,
     handleRulerVsSun: share.handleRulerVsSun,

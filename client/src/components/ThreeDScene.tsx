@@ -53,6 +53,8 @@ export type { CompareOrbitSpec } from "./scene/types";
 export type ThreeDSceneProps = {
   items?: CelestialItem[];
   onItemClick: (item: CelestialItem) => void;
+  /** Desktop hover for lightweight tooltips (null clears). Cheap: few planets + page NEOs. */
+  onItemHover?: (item: CelestialItem | null) => void;
   selectedItem: CelestialItem | null;
   showPlanets: boolean;
   planetsData?: Planet[];
@@ -72,6 +74,7 @@ export type ThreeDSceneProps = {
 const ThreeDScene = React.memo(function ThreeDScene({
   items = [],
   onItemClick,
+  onItemHover,
   selectedItem,
   showPlanets,
   planetsData = [],
@@ -119,7 +122,11 @@ const ThreeDScene = React.memo(function ThreeDScene({
 
   /** Warm textures for visible bodies only. */
   useEffect(() => {
-    const srgb: string[] = [EXTRA_MAPS.sun, EXTRA_MAPS.milkyWay];
+    const srgb: string[] = [
+      EXTRA_MAPS.sun,
+      EXTRA_MAPS.milkyWayDisplay,
+      EXTRA_MAPS.milkyWay,
+    ];
     let needEarth = false;
 
     for (const p of bodyPlanets) {
@@ -179,8 +186,12 @@ const ThreeDScene = React.memo(function ThreeDScene({
       <ambientLight intensity={0.14} />
       <hemisphereLight args={["#3a4a68", "#0c0a08", 0.28]} />
 
-      {q.enableMilkyWay && <MilkyWaySky />}
-      <RealisticStars count={q.starCount} radius={320} depth={100} />
+      {/*
+        Camera-locked sky (system + near-Earth): constant angular size.
+        Fixed world spheres looked huge/pixelated when zooming.
+      */}
+      {q.enableMilkyWay && <MilkyWaySky nearEarth={nearEarth || issFocus} />}
+      <RealisticStars count={q.starCount} />
       {q.enableShafts && !nearEarth && !issFocus && <ZodiacalDust />}
       <group visible={!nearEarth && !issFocus}>
         <AsteroidBelt trueScale={trueScale} count={q.beltCount} />
@@ -212,6 +223,7 @@ const ThreeDScene = React.memo(function ThreeDScene({
                 livePos={livePos}
                 selected={selectedItem?.id === p.id}
                 onClick={() => onItemClick(p)}
+                onHover={(active) => onItemHover?.(active ? p : null)}
               />
               {showIss && nearEarth && vis && (
                 <IssMarker
@@ -240,6 +252,7 @@ const ThreeDScene = React.memo(function ThreeDScene({
               livePos={livePos}
               selected={selectedItem?.id === p.id}
               onClick={() => onItemClick(p)}
+              onHover={(active) => onItemHover?.(active ? p : null)}
             />
           </group>
         );
@@ -296,6 +309,7 @@ const ThreeDScene = React.memo(function ThreeDScene({
         compareOrbits={compareOrbits}
         livePos={livePos}
         onItemClick={onItemClick}
+        onItemHover={onItemHover}
         hidden={issFocus}
       />
 

@@ -41,13 +41,13 @@ export default function AsteroidBelt({
       </bufferGeometry>
       <pointsMaterial
         map={sprite}
-        size={0.28}
+        size={0.14}
         vertexColors
-        transparent={false}
-        opacity={0.55}
+        transparent
+        opacity={0.4}
         depthWrite={false}
         sizeAttenuation
-        alphaTest={0.5}
+        alphaTest={0.35}
         toneMapped={false}
       />
     </points>

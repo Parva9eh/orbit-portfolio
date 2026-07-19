@@ -24,13 +24,17 @@ export function labelWorldHeight(dist: number, kind: "name" | "detail"): number 
   );
 }
 
-/** Screen-space test: is world point on/near the sun disc from the camera? */
+/**
+ * Screen-space test: is world point on/near the sun disc from the camera?
+ * @param screenPad extra NDC margin (smaller = labels stay visible longer near the sun)
+ */
 export function isNearSunDisc(
   world: THREE.Vector3,
   camera: THREE.Camera,
   tmpA: THREE.Vector3,
   tmpB: THREE.Vector3,
   labelRadius = 0,
+  screenPad = 0.02,
 ): boolean {
   if (!(camera instanceof THREE.PerspectiveCamera)) {
     // Fallback to crude angular test for non-perspective cameras.
@@ -44,8 +48,19 @@ export function isNearSunDisc(
     const sunDist = camera.position.length();
     if (sunDist <= SUN_RADIUS) return true;
     const sunAngle = Math.asin(Math.min(1, SUN_RADIUS / sunDist));
-    const bufferAngle = 0.05;
+    const bufferAngle = 0.035;
     return cos > Math.cos(sunAngle + bufferAngle + labelRadius);
+  }
+
+  // Behind the near plane or far outside NDC — don't treat as sun-blocked
+  const labelScreen = new THREE.Vector3().copy(world).project(camera);
+  if (
+    labelScreen.z < -1 ||
+    labelScreen.z > 1 ||
+    Math.abs(labelScreen.x) > 1.4 ||
+    Math.abs(labelScreen.y) > 1.4
+  ) {
+    return false;
   }
 
   const screenSun = tmpA.set(0, 0, 0).project(camera);
@@ -56,7 +71,6 @@ export function isNearSunDisc(
   const screenSunEdge = sunWorldEdge.project(camera);
   const sunRadius = Math.abs(screenSunEdge.x - screenSun.x);
 
-  const labelScreen = new THREE.Vector3().copy(world).project(camera);
   const labelDist = camera.position.distanceTo(world);
   const labelWorldRadius = labelDist * Math.tan(labelRadius);
   const labelWorldEdge = new THREE.Vector3()
@@ -69,7 +83,7 @@ export function isNearSunDisc(
     labelScreen.x - screenSun.x,
     labelScreen.y - screenSun.y,
   );
-  return dist < sunRadius + labelRadiusScreen + 0.03;
+  return dist < sunRadius + labelRadiusScreen + screenPad;
 }
 
 

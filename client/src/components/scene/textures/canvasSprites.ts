@@ -32,6 +32,43 @@ export function makeCircleSprite(size = 64, soft = true): THREE.CanvasTexture {
   return tex;
 }
 
+/**
+ * Airy-like star kernel: tiny bright core + soft diffraction halo.
+ * Avoids the solid-disc look of a wide opaque circle sprite.
+ */
+export function makeStarSprite(size = 128): THREE.CanvasTexture {
+  const c = document.createElement("canvas");
+  c.width = c.height = size;
+  const ctx = c.getContext("2d")!;
+  ctx.clearRect(0, 0, size, size);
+  const r = size / 2;
+  // Wide faint halo
+  const halo = ctx.createRadialGradient(r, r, 0, r, r, r);
+  halo.addColorStop(0.0, "rgba(255,255,255,0.55)");
+  halo.addColorStop(0.08, "rgba(255,255,255,0.22)");
+  halo.addColorStop(0.22, "rgba(255,255,255,0.06)");
+  halo.addColorStop(0.5, "rgba(255,255,255,0.015)");
+  halo.addColorStop(1.0, "rgba(255,255,255,0)");
+  ctx.fillStyle = halo;
+  ctx.fillRect(0, 0, size, size);
+  // Pinprick core
+  const core = ctx.createRadialGradient(r, r, 0, r, r, r * 0.12);
+  core.addColorStop(0.0, "rgba(255,255,255,1)");
+  core.addColorStop(0.35, "rgba(255,255,255,0.85)");
+  core.addColorStop(1.0, "rgba(255,255,255,0)");
+  ctx.fillStyle = core;
+  ctx.fillRect(0, 0, size, size);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.premultiplyAlpha = true;
+  tex.flipY = false;
+  tex.minFilter = THREE.LinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  tex.generateMipmaps = false;
+  tex.needsUpdate = true;
+  return tex;
+}
+
 
 /**
  * Soft white→transparent radial glow for lens flare.

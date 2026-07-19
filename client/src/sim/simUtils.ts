@@ -37,7 +37,8 @@ export function qualitySettings(q: QualityPreset) {
       enableShafts: false,
       enableScatter: false,
       enableGodFx: false,
-      enableMilkyWay: false,
+      // Still show the sky plate on Low — cheap BackSide sphere
+      enableMilkyWay: true,
       dprMax: 1,
       orbitSegments: 384,
       maxNeos: 8,
@@ -50,8 +51,8 @@ export function qualitySettings(q: QualityPreset) {
   }
 
   return {
-    starCount: 5200,
-    beltCount: 1200,
+    starCount: 8500,
+    beltCount: 900,
     bloomIntensity: 0.42,
     bloomThreshold: 0.7,
     enableShafts: true,

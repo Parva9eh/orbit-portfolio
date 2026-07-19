@@ -116,11 +116,14 @@ export default function PlanetBody({
   planet,
   livePos,
   onClick,
+  onHover,
   selected,
 }: {
   planet: Planet;
   livePos: React.MutableRefObject<Map<string, THREE.Vector3>>;
   onClick: () => void;
+  /** Lightweight pointer hover (desktop) — optional */
+  onHover?: (active: boolean) => void;
   selected: boolean;
 }) {
   const groupRef = useRef<THREE.Group>(null);
@@ -225,6 +228,15 @@ export default function PlanetBody({
       onClick={(e) => {
         e.stopPropagation();
         onClick();
+      }}
+      onPointerOver={(e) => {
+        e.stopPropagation();
+        document.body.style.cursor = "pointer";
+        onHover?.(true);
+      }}
+      onPointerOut={() => {
+        document.body.style.cursor = "auto";
+        onHover?.(false);
       }}
     >
       <mesh ref={bodyRef} scale={displaySize}>
