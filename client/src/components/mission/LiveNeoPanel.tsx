@@ -100,8 +100,6 @@ export default function LiveNeoPanel({
     onDismissSentryBrief,
     onSentryLookupSbdb,
     sentrySbdbHint,
-    onExportSummary,
-    exportStatus,
     rulerApproachMiss,
     onRulerVsEarth,
     onRulerVsSun,
@@ -527,8 +525,6 @@ export default function LiveNeoPanel({
               onCopyLink={onCopyLink}
               copyLinkStatus={copyLinkStatus}
               onClearCompare={onClearCompare}
-              onExportSummary={onExportSummary}
-              exportStatus={exportStatus}
             />
           </PanelSection>
         </div>

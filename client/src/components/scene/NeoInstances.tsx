@@ -21,6 +21,7 @@ type NeoInstancesProps = {
   compareOrbits: CompareOrbitSpec[];
   livePos: React.MutableRefObject<Map<string, THREE.Vector3>>;
   onItemClick: (item: Asteroid) => void;
+  onItemHover?: (item: Asteroid | null) => void;
   /** Hide NEO field during ISS focus */
   hidden?: boolean;
 };
@@ -35,6 +36,7 @@ export default function NeoInstances({
   compareOrbits,
   livePos,
   onItemClick,
+  onItemHover,
   hidden = false,
 }: NeoInstancesProps) {
   const asteroidGltf = useGLTF("/models/bennu.glb", true) as GLTF;
@@ -226,6 +228,30 @@ export default function NeoInstances({
         const id = e.instanceId;
         if (id == null || id < 0 || id >= list.length) return;
         onItemClick(list[id]);
+      }}
+      // Use move + over: InstancedMesh only re-fires over/out when leaving the
+      // whole mesh, not when sliding between instances.
+      onPointerOver={(e) => {
+        e.stopPropagation();
+        const id = e.instanceId;
+        if (id == null || id < 0 || id >= list.length) return;
+        document.body.style.cursor = "pointer";
+        onItemHover?.(list[id]);
+      }}
+      onPointerMove={(e) => {
+        e.stopPropagation();
+        const id = e.instanceId;
+        if (id == null || id < 0 || id >= list.length) {
+          document.body.style.cursor = "auto";
+          onItemHover?.(null);
+          return;
+        }
+        document.body.style.cursor = "pointer";
+        onItemHover?.(list[id]);
+      }}
+      onPointerOut={() => {
+        document.body.style.cursor = "auto";
+        onItemHover?.(null);
       }}
     />
   );

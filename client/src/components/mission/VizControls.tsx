@@ -73,6 +73,7 @@ export default function VizControls({
     trueScale,
     showLabels,
     audioEnabled,
+    sfxEnabled,
     cameraMode,
     quality,
     viewScale,
@@ -82,6 +83,7 @@ export default function VizControls({
     setTrueScale,
     setShowLabels,
     setAudioEnabled,
+    setSfxEnabled,
     setCameraMode,
     setQuality,
     setViewScale,
@@ -125,10 +127,10 @@ export default function VizControls({
 
   const playClick = useCallback(() => {
     const c = clickRef.current;
-    if (!c || !audioEnabled) return;
+    if (!c || !sfxEnabled) return;
     c.currentTime = 0;
     void c.play().catch(() => {});
-  }, [audioEnabled]);
+  }, [sfxEnabled]);
 
   useEffect(() => {
     const handler = () => playClick();
@@ -180,14 +182,29 @@ export default function VizControls({
           />
           Labels
         </label>
-        <label className="inline-flex items-center gap-1.5 cursor-pointer py-1">
+        <label
+          className="inline-flex items-center gap-1.5 cursor-pointer py-1"
+          title="Ambient loop (opt-in)"
+        >
           <input
             type="checkbox"
             checked={audioEnabled}
             onChange={(e) => setAudioEnabled(e.target.checked)}
             className="accent-custom-blue h-3.5 w-3.5"
           />
-          Audio
+          Music
+        </label>
+        <label
+          className="inline-flex items-center gap-1.5 cursor-pointer py-1"
+          title="UI click sounds (on by default)"
+        >
+          <input
+            type="checkbox"
+            checked={sfxEnabled}
+            onChange={(e) => setSfxEnabled(e.target.checked)}
+            className="accent-custom-blue h-3.5 w-3.5"
+          />
+          Clicks
         </label>
       </div>
 

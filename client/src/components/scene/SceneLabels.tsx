@@ -39,12 +39,14 @@ export default function SceneLabels({
             name={c.name}
             livePos={livePos}
             systemView={!nearEarth}
+            priority="neo"
           />
         ))}
 
       {/*
         Outline-only sprite labels (no dark panels).
-        Near-Earth: Earth + selected only — fewer chips near the sun.
+        System: all visible planets. Near-Earth: Earth + selection only.
+        NEOs stay selected/compare-only (hover chip covers the rest).
       */}
       {showLabels &&
         bodyPlanets
@@ -60,6 +62,7 @@ export default function SceneLabels({
               name={p.name}
               livePos={livePos}
               systemView={!nearEarth}
+              priority="body"
             />
           ))}
 
@@ -73,6 +76,7 @@ export default function SceneLabels({
             name={selectedItem.name}
             livePos={livePos}
             systemView={!nearEarth}
+            priority="neo"
           />
         )}
 
