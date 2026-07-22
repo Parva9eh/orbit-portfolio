@@ -219,6 +219,8 @@ Live list loads · Comms test message arrives · no NASA key or personal email i
 | `PORT` | `8000` | HTTP port |
 | `HOST` | `0.0.0.0` | Bind address |
 | `CORS_ORIGIN` | *(unset = allow all)* | Comma-separated origins for public deploys |
+| `RATE_LIMIT_WINDOW_MS` | `60000` | Sliding window for `/api/*` rate limit |
+| `RATE_LIMIT_MAX` | `120` | Max requests per IP per window (`/health` unlimited) |
 | `NODE_ENV` | — | Warns if production + open CORS |
 
 ### Client
@@ -240,6 +242,8 @@ Read-only proxy for public science APIs:
 - Pagination and date params bounded
 - JSON body limit `32kb`; API is GET-oriented
 - Production CORS allowlist via `CORS_ORIGIN`
+- Per-IP rate limit on `/api/*` (Helmet headers + trust proxy)
+- SPA: CSP + HSTS + frame/nosniff headers on Vercel; unknown static extensions 404 (no SPA fallthrough)
 - `X-Powered-By` disabled; generic 500 responses
 - Upstream hosts are fixed (no user-controlled fetch URLs)
 
