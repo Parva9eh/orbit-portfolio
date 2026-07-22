@@ -414,7 +414,7 @@ export function useMissionControlModel(): MissionControlModel {
   const canvas = (
     <>
       <Canvas
-        camera={{ position: [48, 52, 88], fov: 48, near: 0.1, far: 2500 }}
+        camera={{ position: [48, 52, 88], fov: 48, near: 0.05, far: 5000 }}
         dpr={[1, 2]}
         gl={{
           antialias: true,
