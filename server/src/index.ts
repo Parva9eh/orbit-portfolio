@@ -2,13 +2,30 @@ import express from "express";
 import cors from "cors";
 import compression from "compression";
 import dotenv from "dotenv";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
 import astroRoutes from "./routes/index.ts";
 
 dotenv.config();
 
 const app = express();
+// Behind Render/Cloudflare — required for correct client IPs in rate limiting
+app.set("trust proxy", 1);
 // Reduce fingerprinting surface
 app.disable("x-powered-by");
+
+/**
+ * Baseline API security headers (JSON API — no browser CSP here).
+ * SPA CSP is enforced on Vercel.
+ */
+app.use(
+  helmet({
+    contentSecurityPolicy: false,
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+    crossOriginOpenerPolicy: { policy: "same-origin" },
+    referrerPolicy: { policy: "no-referrer" },
+  })
+);
 
 /**
  * CORS:
@@ -55,6 +72,21 @@ if (corsOriginEnv) {
 app.use(compression());
 // Read-mostly API; keep body tiny if anything POSTs later
 app.use(express.json({ limit: "32kb" }));
+
+/**
+ * Rate limit NASA-proxied routes. Health stays unrestricted for uptime probes.
+ * Override with RATE_LIMIT_WINDOW_MS / RATE_LIMIT_MAX if needed.
+ */
+const rateWindowMs = Number(process.env.RATE_LIMIT_WINDOW_MS) || 60_000;
+const rateMax = Number(process.env.RATE_LIMIT_MAX) || 120;
+const apiLimiter = rateLimit({
+  windowMs: rateWindowMs,
+  max: rateMax,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many requests — try again shortly" },
+});
+app.use("/api", apiLimiter);
 app.use("/api", astroRoutes);
 
 // Lightweight health for uptime checks (no cache / no NASA)
