@@ -48,8 +48,8 @@ export default function BodyInspector({
     <div
       className={
         compact
-          ? "rounded-lg bg-black/40 border border-white/5 p-2.5"
-          : "rounded-xl border border-white/10 bg-[#0f1623]/cc backdrop-blur-md shadow-2xl p-3.5"
+          ? "rounded-lg bg-black/55 border border-white/8 p-2.5"
+          : "rounded-xl border border-white/12 bg-[#080d16] backdrop-blur-md shadow-2xl p-3.5"
       }
       role="region"
       aria-label={`Inspect ${item.name}`}

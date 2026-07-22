@@ -57,7 +57,7 @@ function VizInfoPanel({ id }: { id: string }) {
   return (
     <div
       id={id}
-      className="rounded-lg border border-sky-400/25 bg-sky-950/40 px-2.5 py-2 space-y-2 text-[10px] leading-snug text-gray-300"
+      className="rounded-lg border border-sky-400/25 bg-[#061018] px-2.5 py-2 space-y-2 text-[10px] leading-snug text-gray-300"
       role="region"
       aria-label="Visualization help"
     >
@@ -306,10 +306,10 @@ export default function VizControls({
     <div
       className={
         embedded
-          ? `relative w-full flex flex-col gap-1.5 p-2 rounded-xl border border-white/10 bg-[#0f1623]/95 backdrop-blur-md text-[0.7rem] text-gray-300 shadow-xl ${
+          ? `relative w-full flex flex-col gap-1.5 p-2 rounded-xl border border-white/12 bg-[#080d16] backdrop-blur-md text-[0.7rem] text-gray-300 shadow-xl ${
               compact ? "max-h-[40dvh] overflow-y-auto overscroll-contain" : ""
             }`
-          : "absolute z-30 bottom-12 left-1/2 -translate-x-1/2 md:left-auto md:right-4 md:translate-x-0 md:bottom-14 flex flex-col gap-2 p-2.5 rounded-xl border border-white/10 bg-[#0f1623]/90 backdrop-blur-md text-[0.7rem] text-gray-300 shadow-xl max-w-[min(92vw,300px)]"
+          : "absolute z-30 bottom-12 left-1/2 -translate-x-1/2 md:left-auto md:right-4 md:translate-x-0 md:bottom-14 flex flex-col gap-2 p-2.5 rounded-xl border border-white/12 bg-[#080d16] backdrop-blur-md text-[0.7rem] text-gray-300 shadow-xl max-w-[min(92vw,300px)]"
       }
       role="toolbar"
       aria-label="Visualization controls"

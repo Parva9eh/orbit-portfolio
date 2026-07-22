@@ -32,7 +32,7 @@ export default function MissionTopBar({
         grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-1.5 sm:gap-3
         px-2.5 py-2 sm:px-4 sm:py-3 md:px-5
         safe-pad-x safe-pad-t
-        bg-gradient-to-b from-black/90 via-black/70 to-transparent"
+        bg-gradient-to-b from-black/95 via-black/80 to-transparent"
     >
       <div className="shrink-0 min-w-0 max-w-[4.25rem] sm:max-w-none">
         <div className="font-bold tracking-widest text-xs sm:text-sm md:text-base truncate">

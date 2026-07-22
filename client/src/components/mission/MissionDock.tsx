@@ -292,7 +292,7 @@ function LiveMobileBanner({ onDismiss }: { onDismiss?: () => void }) {
   return (
     <div
       className="absolute z-20 left-3 right-3 top-[6.4rem]
-        rounded-xl border border-white/10 bg-[#0f1623]/92 backdrop-blur-md shadow-xl
+        rounded-xl border border-white/12 bg-[#080d16] backdrop-blur-md shadow-xl
         px-3 py-2.5 safe-pad-x pointer-events-auto"
       role="region"
       aria-label="Live guide"
@@ -484,13 +484,13 @@ export default function MissionDock({
     <aside
       className={
         landscape
-          ? `absolute z-20 flex flex-col overflow-hidden rounded-xl border border-white/10 bg-[#0f1623]/cc backdrop-blur-md shadow-2xl
+          ? `absolute z-20 flex flex-col overflow-hidden rounded-xl border border-white/12 bg-[#080d16] backdrop-blur-md shadow-2xl
               left-2 top-14 bottom-12 w-[min(46vw,22rem)] max-h-none safe-pad-x`
           : isLive
-            ? `absolute z-20 flex flex-col overflow-hidden rounded-xl border border-white/10 bg-[#0f1623]/cc backdrop-blur-md shadow-2xl
+            ? `absolute z-20 flex flex-col overflow-hidden rounded-xl border border-white/12 bg-[#080d16] backdrop-blur-md shadow-2xl
                 left-4 top-16 w-[min(320px,90vw)] max-h-[min(48vh,26rem)]
                 safe-pad-x`
-            : `absolute z-20 flex flex-col overflow-hidden rounded-xl border border-white/10 bg-[#0f1623]/cc backdrop-blur-md shadow-2xl
+            : `absolute z-20 flex flex-col overflow-hidden rounded-xl border border-white/12 bg-[#080d16] backdrop-blur-md shadow-2xl
                 left-3 right-3 top-14 bottom-12
                 max-md:top-[3.5rem] max-md:bottom-11
                 safe-pad-x
