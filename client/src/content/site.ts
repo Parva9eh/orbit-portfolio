@@ -28,8 +28,6 @@ export type SiteContent = {
   summary: string;
   location: string;
   openToWork: boolean;
-  /** Public resume link, or `#` to hide the Resume control */
-  resumeUrl: string;
   social: {
     github: string;
     /** Public portfolio domain */
@@ -50,7 +48,6 @@ export const site: SiteContent = {
     "I build full-stack applications from polished client interfaces to production APIs and data pipelines: TypeScript/React and Next.js on the front, Express/Node and FastAPI on the back, plus cloud services (Firebase, Supabase, Azure AI, Stripe). Work spans accessibility (TexDio OCR/TTS), e-commerce, clinical marketing sites, sports analytics, and ORBIT — this live NEO Mission Control demo with science APIs and React Three Fiber. I use modern AI pair-programming tools (including xAI Grok Build) for speed while owning architecture, review, and shipping. Comfortable owning features across the stack, not only the pixels.",
   location: "Vancouver, BC · remote-friendly",
   openToWork: true,
-  resumeUrl: "/resume.pdf",
   social: {
     github: "https://github.com/Parva9eh",
     portfolio: "https://parva9eh.com",
