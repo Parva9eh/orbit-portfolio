@@ -39,6 +39,9 @@ export function qualitySettings(q: QualityPreset) {
       enableGodFx: false,
       // Still show the sky plate on Low — cheap BackSide sphere
       enableMilkyWay: true,
+      enableMeteors: true,
+      meteorMax: 2,
+      meteorInterval: 5.5,
       dprMax: 1,
       orbitSegments: 384,
       maxNeos: 8,
@@ -51,14 +54,18 @@ export function qualitySettings(q: QualityPreset) {
   }
 
   return {
-    starCount: 11000,
-    beltCount: 900,
+    // 8k stars still dense; 11k was mostly free cost on mid GPUs
+    starCount: 8000,
+    beltCount: 700,
     bloomIntensity: 0.42,
     bloomThreshold: 0.7,
     enableShafts: true,
     enableScatter: false,
     enableGodFx: true,
     enableMilkyWay: true,
+    enableMeteors: true,
+    meteorMax: 5,
+    meteorInterval: 2.2,
     dprMax: 2,
     orbitSegments: 768,
     maxNeos: 28,
