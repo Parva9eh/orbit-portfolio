@@ -15,6 +15,7 @@ const MissionControl = React.memo(function MissionControl() {
         onStepChange={shell.onStepChange}
         onModeChange={shell.onModeChange}
         onEnterLive={shell.onEnterLive}
+        onEnsureLiveMode={shell.onEnsureLiveMode}
         liveToolsOpen={shell.liveToolsOpen}
         canvas={canvas}
         status={shell.status}
