@@ -301,8 +301,8 @@ export default function LiveNeoPanel({
     .join(" · ");
 
   const shellClass = embedded
-    ? "relative h-full w-full z-auto rounded-xl border border-white/10 bg-[#0f1623]/cc backdrop-blur-md shadow-2xl flex flex-col overflow-hidden min-h-0"
-    : `absolute z-40 rounded-xl border border-white/10 bg-[#0f1623]/cc backdrop-blur-md shadow-2xl
+    ? "relative h-full w-full z-auto rounded-xl border border-white/12 bg-[#080d16] backdrop-blur-md shadow-2xl flex flex-col overflow-hidden min-h-0"
+    : `absolute z-40 rounded-xl border border-white/12 bg-[#080d16] backdrop-blur-md shadow-2xl
         flex flex-col overflow-hidden
         left-3 right-3
         bottom-[calc(42vh+3.5rem)] max-h-[min(38vh,calc(100dvh-14rem))]
@@ -443,7 +443,7 @@ export default function LiveNeoPanel({
       </div>
 
       {compareIds.length > 0 && (
-        <div className="mb-2 sticky top-0 z-[1] py-1 bg-[#0f1623]/90 backdrop-blur-sm">
+        <div className="mb-2 sticky top-0 z-[1] py-1 bg-[#080d16] backdrop-blur-sm">
           <ComparePanel
             items={compareItems}
             selectedId={
@@ -628,7 +628,7 @@ export default function LiveNeoPanel({
       )}
 
       {/* Sticky header */}
-      <div className="shrink-0 sticky top-0 z-10 px-3 pt-2.5 pb-2 border-b border-white/10 bg-[#0f1623]/95 backdrop-blur-md">
+      <div className="shrink-0 sticky top-0 z-10 px-3 pt-2.5 pb-2 border-b border-white/10 bg-[#080d16] backdrop-blur-md">
         <div className="flex items-center justify-between gap-2 mb-1.5">
           <h4 className="text-xs tracking-widest uppercase text-cyan-300 font-semibold">
             Live NEO tools
@@ -741,7 +741,7 @@ export default function LiveNeoPanel({
 
       {/* Pagination — catalog context only on mobile */}
       {(!narrow || tab === "catalog") && (
-        <div className="shrink-0 flex items-center justify-between gap-2 px-3.5 py-2.5 border-t border-white/10 bg-[#0c121c]/95 text-xs text-gray-400">
+        <div className="shrink-0 flex items-center justify-between gap-2 px-3.5 py-2.5 border-t border-white/10 bg-[#060a12] text-xs text-gray-400">
           <button
             type="button"
             disabled={safePage <= 1 || listLoading}

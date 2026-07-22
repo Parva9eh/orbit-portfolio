@@ -159,7 +159,7 @@ export default function ComparePanel({
 
   return (
     <div
-      className="mb-2.5 rounded-lg border border-white/10 bg-[#0c121c]/90 p-2"
+      className="mb-2.5 rounded-lg border border-white/12 bg-[#080d16] p-2"
       role="region"
       aria-label="Orbit compare"
     >

@@ -348,7 +348,7 @@ export default function MissionShell({
             <button
               type="button"
               aria-label="Dismiss NEO tools"
-              className="absolute inset-0 z-0 bg-black/40 pointer-events-auto animate-fade-in"
+              className="absolute inset-0 z-0 bg-black/55 pointer-events-auto animate-fade-in"
               onClick={() => setLiveOpenMobile(false)}
             />
             <div
