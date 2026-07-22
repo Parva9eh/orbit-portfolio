@@ -83,6 +83,8 @@ export const PLANET_SEEDS: PlanetSeed[] = [
     eccentricity: 0.048,
     inclinationDeg: 1.3,
     phaseDeg: 15,
+    /** Faint dust rings (schematic in client) */
+    hasRings: true,
   },
   {
     name: "Saturn",
@@ -108,6 +110,8 @@ export const PLANET_SEEDS: PlanetSeed[] = [
     eccentricity: 0.047,
     inclinationDeg: 0.77,
     phaseDeg: 160,
+    /** Dark thin rings (schematic in client); extreme tilt from tiltDeg */
+    hasRings: true,
   },
   {
     name: "Neptune",
@@ -120,6 +124,8 @@ export const PLANET_SEEDS: PlanetSeed[] = [
     eccentricity: 0.009,
     inclinationDeg: 1.77,
     phaseDeg: 220,
+    /** Faint incomplete arcs (schematic in client) */
+    hasRings: true,
   },
 ];
 

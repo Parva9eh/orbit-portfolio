@@ -337,9 +337,10 @@ function CommsBody() {
   return (
     <>
       <p className="mb-3 text-gray-400">
-        Open to roles and collabs in product frontend, creative tech, and
-        data-rich 3D experiences. Happy to walk through ORBIT live or dig into
-        architecture (API cache, scene split, mission state).
+        Open to full-stack roles and collabs — product UIs (React/Next), APIs
+        and services (Node/Express, Python/FastAPI), data layers, and
+        interactive 3D when the product needs it. Happy to walk through ORBIT
+        live or dig into architecture end-to-end (client, API cache, deploy).
       </p>
       <p className="text-[10px] uppercase tracking-wider text-cyan-300/80 font-semibold mb-1.5">
         Secure channel
@@ -458,7 +459,7 @@ export default function MissionDock({
     );
   } else if (step === "comms") {
     title = "Transmission";
-    role = "Let's connect";
+    role = "Full-stack · product & platforms";
     body = <CommsBody />;
     foot = (
       <>
@@ -494,7 +495,7 @@ export default function MissionDock({
                 left-3 right-3 top-14 bottom-12
                 max-md:top-[3.5rem] max-md:bottom-11
                 safe-pad-x
-                md:left-4 md:right-auto md:top-16 md:bottom-14 md:w-[min(360px,92vw)]`
+                md:left-4 md:right-auto md:top-16 md:bottom-14 md:w-[min(380px,92vw)]`
       }
       aria-live="polite"
       data-landscape={landscape ? "true" : "false"}
@@ -505,7 +506,20 @@ export default function MissionDock({
           {meta.section}
         </p>
         <h2 className="text-xl font-bold leading-tight text-white">{title}</h2>
-        <p className="text-sm font-semibold text-sky-300 mt-1">{role}</p>
+        {/*
+          Role line: avoid orphan words (e.g. "Tech" alone on tablet).
+          Break only at · so each phrase stays on one line.
+        */}
+        <p className="text-[0.8125rem] sm:text-sm font-semibold text-sky-300 mt-1 leading-snug">
+          {role.includes(" · ")
+            ? role.split(" · ").map((part, i) => (
+                <span key={`${part}-${i}`}>
+                  {i > 0 && <span className="text-sky-400/80"> · </span>}
+                  <span className="whitespace-nowrap">{part}</span>
+                </span>
+              ))
+            : role}
+        </p>
       </div>
       <div
         className={`px-4 py-3 text-sm text-gray-400 animate-fade-in ${

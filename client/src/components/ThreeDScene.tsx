@@ -23,6 +23,7 @@ import IssMarker from "./scene/IssMarker";
 import MeasureLine from "./scene/MeasureLine";
 import MilkyWaySky from "./scene/MilkyWaySky";
 import RealisticStars from "./scene/RealisticStars";
+import Meteors from "./scene/Meteors";
 import ZodiacalDust from "./scene/ZodiacalDust";
 import Sun from "./scene/Sun";
 import OrbitLine from "./scene/OrbitLine";
@@ -192,6 +193,9 @@ const ThreeDScene = React.memo(function ThreeDScene({
       */}
       {q.enableMilkyWay && <MilkyWaySky nearEarth={nearEarth || issFocus} />}
       <RealisticStars count={q.starCount} />
+      {q.enableMeteors && !issFocus && (
+        <Meteors maxActive={q.meteorMax} spawnInterval={q.meteorInterval} />
+      )}
       {q.enableShafts && !nearEarth && !issFocus && <ZodiacalDust />}
       <group visible={!nearEarth && !issFocus}>
         <AsteroidBelt trueScale={trueScale} count={q.beltCount} />

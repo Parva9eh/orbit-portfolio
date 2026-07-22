@@ -280,7 +280,7 @@ export default function ContactForm() {
           className={`${inputClass} resize-y min-h-[4.5rem] ${
             fieldErrors.message ? inputErr : inputOk
           }`}
-          placeholder="Roles, collabs, architecture questions…"
+          placeholder="Roles, collabs, full-stack / API / UI questions…"
           onFocus={scrollFieldIntoView}
           onChange={() =>
             setFieldErrors((e) => ({ ...e, message: undefined }))
