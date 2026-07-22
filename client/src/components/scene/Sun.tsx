@@ -127,15 +127,40 @@ export default function Sun({
         />
       </mesh>
 
+      {/* Extra wide glow for cinematic mock-like sun bloom */}
+      <mesh scale={2.1} renderOrder={-2}>
+        <sphereGeometry args={[SUN_RADIUS, coronaSegs, coronaSegs]} />
+        <shaderMaterial
+          vertexShader={CHROMA_VERT}
+          fragmentShader={/* glsl */ `
+            varying vec3 vNormalV;
+            varying vec3 vViewV;
+            void main() {
+              float ndv = max(dot(normalize(vNormalV), normalize(vViewV)), 0.0);
+              float a = pow(1.0 - ndv, 1.25) * 0.045;
+              if (a < 0.002) discard;
+              vec3 col = mix(vec3(1.0, 0.5, 0.12), vec3(1.0, 0.92, 0.65), ndv);
+              gl_FragColor = vec4(col * a, a);
+            }
+          `}
+          transparent
+          depthWrite={false}
+          depthTest
+          blending={THREE.AdditiveBlending}
+          side={THREE.BackSide}
+          toneMapped={false}
+        />
+      </mesh>
+
       {/* Shared natural flare / bloom substitute for both views */}
       <SolarFlare />
 
       <pointLight
         position={[0, 0, 0]}
         color="#fff4dc"
-        intensity={190}
+        intensity={210}
         decay={2}
-        distance={300}
+        distance={320}
       />
       <pointLight
         position={[0, 0, 0]}
