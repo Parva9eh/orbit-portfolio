@@ -45,7 +45,7 @@ http://localhost:5173/?mode=live
 http://localhost:5173/?mode=live&view=nearEarth&issFocus=1
 ```
 
-Portfolio identity (name, GitHub, resume, projects) lives in `client/src/content/site.ts`.
+Portfolio identity (name, GitHub, projects) lives in `client/src/content/site.ts`.
 
 **Comms** uses a **contact form** (Web3Forms), not a public email address. Create a free key at [web3forms.com](https://web3forms.com), set your inbox there, then:
 

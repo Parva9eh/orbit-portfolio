@@ -32,6 +32,8 @@ export type MissionControlModel = {
     onStepChange: (s: MissionStepId) => void;
     onModeChange: (m: ViewMode) => void;
     onEnterLive: () => void;
+    /** Enable Live tools without forcing step 03 (mobile NEO tools chip). */
+    onEnsureLiveMode: () => void;
     liveToolsOpen: boolean;
     status: {
       loading: boolean;
@@ -71,6 +73,7 @@ export function useMissionControlModel(): MissionControlModel {
     showAsteroids,
     goToStep,
     enterLive,
+    ensureLiveMode,
     handleModeChange,
     pendingNeo,
     pendingCompare,
@@ -484,6 +487,7 @@ export function useMissionControlModel(): MissionControlModel {
       onStepChange: goToStep,
       onModeChange: handleModeChange,
       onEnterLive: enterLive,
+      onEnsureLiveMode: ensureLiveMode,
       liveToolsOpen,
       status: {
         loading,

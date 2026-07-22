@@ -65,13 +65,18 @@ function BriefingBody() {
       >
         {expanded ? "Show less" : "Read more"}
       </button>
-      <p className="text-gray-400 text-sm mb-3">
+      <p className="text-gray-400 text-sm mb-2">
         {site.location}
         {site.openToWork && (
           <span className="ml-2 not-italic text-emerald-400">
             · Open to opportunities
           </span>
         )}
+      </p>
+      <p className="text-[11px] text-cyan-200/85 mb-3 leading-snug">
+        Live NEO catalog, real APIs, and interactive 3D under load —{" "}
+        <span className="text-sky-300 font-semibold">Enter live system</span>{" "}
+        to see it.
       </p>
 
       {site.skills.length > 0 && (
@@ -150,7 +155,11 @@ function ProjectCard({
 
   return (
     <div
-      className={`mb-4 last:mb-0 pb-3 last:pb-0 border-b border-white/5 last:border-0 border-l-2 pl-2.5 -ml-0.5 ${statusBorder(p.status)}`}
+      className={
+        p.featured
+          ? "mb-4 last:mb-0 rounded-lg border border-sky-400/25 bg-sky-950/30 border-l-[3px] border-l-sky-400/80 pl-2.5 pr-2.5 pt-2.5 pb-2.5"
+          : `mb-4 last:mb-0 pb-3 last:pb-0 border-b border-white/5 last:border-0 border-l-2 pl-2.5 -ml-0.5 ${statusBorder(p.status)}`
+      }
     >
       <ProjectMedia p={p} />
       <h3 className="text-white text-base font-semibold mb-1 flex flex-wrap items-center gap-1">
@@ -231,41 +240,96 @@ function ProjectCard({
 }
 
 function ProjectsBody({ onEnterLive }: { onEnterLive: () => void }) {
+  const list = site.projects;
+  const featured = list.filter((p) => p.featured);
+  const rest = list.filter((p) => !p.featured);
+  const ordered = [...featured, ...rest];
+
   return (
     <>
       <p className="text-[11px] text-gray-500 mb-3 leading-snug">
-        Selected work — status and links from the portfolio catalog.
+        Featured first — ORBIT is this Live demo; other work below.
       </p>
-      {site.projects.map((p) => (
+      {ordered.map((p) => (
         <ProjectCard key={p.id} p={p} onEnterLive={onEnterLive} />
       ))}
     </>
   );
 }
 
+/** Desktop Live panel body — short, no scroll needed in the rail. */
 function LiveBody() {
   return (
     <>
-      <p className="mb-3">
-        Live NEO tools are on the{" "}
-        <strong className="text-gray-300">right rail</strong> (or{" "}
-        <strong className="text-gray-300">NEO tools</strong> on mobile) —
-        catalog, filters, compare, Sentry, ruler, and guided tours.
+      <p className="mb-2 text-sm text-gray-300 leading-snug">
+        Catalog, filters, compare, ISS, and tours are on the{" "}
+        <strong className="text-white">right rail</strong>
+        <span className="text-gray-500"> (mobile: NEO tools)</span>.
       </p>
-      <p className="text-sm text-amber-200/80 mb-2 leading-snug rounded-md border border-amber-400/20 bg-amber-950/30 px-2 py-1.5">
+      <p className="text-sm text-amber-200/85 mb-2 leading-snug rounded-md border border-amber-400/20 bg-amber-950/30 px-2 py-1.5">
         First Live request after idle may take ~20–60s while the free API
         wakes up.
       </p>
-      <p className="text-sm text-gray-500 mb-2">
-        <strong className="text-gray-400">Demo path:</strong> Guided tours →
-        Closest today → select + Compare → Show ISS / Focus ISS → optional
-        Sentry pick. Copy link to share the same briefing.
+      <p className="text-[11px] text-gray-500 leading-snug mb-1.5">
+        Tip: Guided tours → Closest today → select + Compare. Free cam to
+        explore; Focus after you pick a body.
       </p>
-      <p className="text-sm text-gray-500">
-        Near-Earth view is honest for miss distances; System view is for planets
-        and SBDB heliocentric orbits.
+      <p className="text-[11px] text-sky-200/80 leading-snug">
+        We&apos;re inside the galactic disk — the band is our Milky Way. The
+        Sun&apos;s ~230 Myr galactic orbit isn&apos;t animated here (planetary
+        mission control only).{" "}
+        <span className="text-gray-500">Viz ⓘ · tours: Inside the disk.</span>
       </p>
     </>
+  );
+}
+
+/**
+ * Mobile Live: single non-scrolling tip card (top).
+ * Avoids the old bottom dock that forced awkward nested scroll.
+ */
+function LiveMobileBanner({ onDismiss }: { onDismiss?: () => void }) {
+  return (
+    <div
+      className="absolute z-20 left-3 right-3 top-[6.4rem]
+        rounded-xl border border-white/10 bg-[#0f1623]/92 backdrop-blur-md shadow-xl
+        px-3 py-2.5 safe-pad-x pointer-events-auto"
+      role="region"
+      aria-label="Live guide"
+      data-step="live"
+    >
+      <div className="flex items-start gap-2">
+        <div className="min-w-0 flex-1">
+          <p className="text-[0.65rem] tracking-[0.12em] uppercase text-cyan-300 font-semibold">
+            Sec 03 · Live system
+          </p>
+          <p className="text-[12px] text-gray-200 leading-snug mt-1">
+            <span className="text-sky-200 font-semibold">NEO tools</span> for
+            catalog &amp; tours ·{" "}
+            <span className="text-cyan-200 font-semibold">Viz</span> for camera
+            &amp; quality.
+          </p>
+          <p className="text-[11px] text-amber-200/85 leading-snug mt-1.5">
+            First load after idle may take ~20–60s (free API wake).
+          </p>
+          <p className="text-[10px] text-sky-200/75 leading-snug mt-1">
+            Inside the galactic disk — Sun&apos;s galactic orbit not animated
+            (see Viz ⓘ · tour: Inside the disk).
+          </p>
+        </div>
+        {onDismiss && (
+          <button
+            type="button"
+            onClick={onDismiss}
+            className="shrink-0 text-[10px] font-semibold px-2 py-1 rounded-full border border-white/15
+              text-gray-300 hover:text-white hover:border-sky-400/40"
+            aria-label="Dismiss live guide"
+          >
+            Got it
+          </button>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -291,6 +355,14 @@ type MissionDockProps = {
   onEnterLive: () => void;
   /** Phone/tablet landscape: dock sits on the left half so tools can slide from the right */
   landscape?: boolean;
+  /**
+   * Live guide presentation:
+   * - panel: desktop/left rail (or landscape)
+   * - banner: mobile top tip card, no scroll
+   */
+  liveLayout?: "panel" | "banner";
+  /** Collapse / dismiss Live guide */
+  onRequestClose?: () => void;
 };
 
 export default function MissionDock({
@@ -298,13 +370,19 @@ export default function MissionDock({
   onStepChange,
   onEnterLive,
   landscape = false,
+  liveLayout = "panel",
+  onRequestClose,
 }: MissionDockProps) {
   const meta = MISSION_STEPS.find((s) => s.id === step) ?? MISSION_STEPS[0];
+
+  // Mobile Live: non-scrolling top banner instead of bottom dock
+  if (step === "live" && liveLayout === "banner") {
+    return <LiveMobileBanner onDismiss={onRequestClose} />;
+  }
 
   let title = site.name;
   let role = site.role;
   let body: ReactNode = <BriefingBody />;
-  const showResume = Boolean(site.resumeUrl && site.resumeUrl !== "#");
 
   let foot: ReactNode = (
     <>
@@ -322,16 +400,6 @@ export default function MissionDock({
       >
         View projects
       </button>
-      {showResume && (
-        <a
-          href={site.resumeUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold border border-white/15 text-white hover:border-sky-300 hover:text-sky-300"
-        >
-          Resume PDF
-        </a>
-      )}
     </>
   );
 
@@ -363,6 +431,15 @@ export default function MissionDock({
     body = <LiveBody />;
     foot = (
       <>
+        {onRequestClose && (
+          <button
+            type="button"
+            onClick={onRequestClose}
+            className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold border border-white/15 text-gray-300 hover:border-sky-300 hover:text-sky-200"
+          >
+            Hide guide
+          </button>
+        )}
         <button
           type="button"
           onClick={() => onStepChange("projects")}
@@ -397,8 +474,11 @@ export default function MissionDock({
     );
   }
 
-  /** Story steps: use more vertical space; Live stays compact so the canvas reads. */
-  const storyTall = step !== "live";
+  /**
+   * 01/02/04: tall content dock.
+   * 03 Live (panel): left rail on desktop / landscape — auto height, no nested scroll fight.
+   */
+  const isLive = step === "live";
 
   return (
     <aside
@@ -406,17 +486,15 @@ export default function MissionDock({
         landscape
           ? `absolute z-20 flex flex-col overflow-hidden rounded-xl border border-white/10 bg-[#0f1623]/cc backdrop-blur-md shadow-2xl
               left-2 top-14 bottom-12 w-[min(46vw,22rem)] max-h-none safe-pad-x`
-          : storyTall
+          : isLive
             ? `absolute z-20 flex flex-col overflow-hidden rounded-xl border border-white/10 bg-[#0f1623]/cc backdrop-blur-md shadow-2xl
+                left-4 top-16 w-[min(320px,90vw)] max-h-[min(48vh,26rem)]
+                safe-pad-x`
+            : `absolute z-20 flex flex-col overflow-hidden rounded-xl border border-white/10 bg-[#0f1623]/cc backdrop-blur-md shadow-2xl
                 left-3 right-3 top-14 bottom-12
                 max-md:top-[3.5rem] max-md:bottom-11
                 safe-pad-x
                 md:left-4 md:right-auto md:top-16 md:bottom-14 md:w-[min(360px,92vw)]`
-            : `absolute z-20 flex flex-col overflow-hidden rounded-xl border border-white/10 bg-[#0f1623]/cc backdrop-blur-md shadow-2xl
-                left-3 right-3 bottom-12 max-h-[min(28vh,12rem)]
-                max-md:max-h-[min(26dvh,11rem)]
-                safe-pad-x
-                md:left-4 md:right-auto md:top-16 md:bottom-14 md:w-[min(360px,92vw)] md:max-h-none`
       }
       aria-live="polite"
       data-landscape={landscape ? "true" : "false"}
@@ -429,7 +507,11 @@ export default function MissionDock({
         <h2 className="text-xl font-bold leading-tight text-white">{title}</h2>
         <p className="text-sm font-semibold text-sky-300 mt-1">{role}</p>
       </div>
-      <div className="px-4 py-3 overflow-y-auto flex-1 text-sm text-gray-400 animate-fade-in">
+      <div
+        className={`px-4 py-3 text-sm text-gray-400 animate-fade-in ${
+          isLive ? "overflow-hidden" : "overflow-y-auto flex-1"
+        }`}
+      >
         {body}
       </div>
       <div className="px-4 py-3 border-t border-white/10 flex flex-wrap gap-2 shrink-0">

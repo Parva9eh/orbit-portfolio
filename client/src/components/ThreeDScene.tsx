@@ -183,8 +183,8 @@ const ThreeDScene = React.memo(function ThreeDScene({
 
   return (
     <group>
-      <ambientLight intensity={0.14} />
-      <hemisphereLight args={["#3a4a68", "#0c0a08", 0.28]} />
+      <ambientLight intensity={0.16} />
+      <hemisphereLight args={["#4a5f88", "#0a0c14", 0.32]} />
 
       {/*
         Camera-locked sky (system + near-Earth): constant angular size.
@@ -207,7 +207,7 @@ const ThreeDScene = React.memo(function ThreeDScene({
             key={`p-orbit-${o.id}`}
             points={o.points}
             color={o.color}
-            opacity={nearEarth ? 0.58 : 0.52}
+            opacity={nearEarth ? 0.62 : 0.58}
             lineWidth={q.orbitLineWidth}
             selected={selectedItem?.id === o.id}
           />

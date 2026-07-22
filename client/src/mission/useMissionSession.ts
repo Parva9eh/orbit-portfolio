@@ -22,29 +22,43 @@ import {
 
 const STEP_IDS = MISSION_STEPS.map((s) => s.id);
 
+/** Phones: Near-Earth. Tablets + desktop: System (unless URL overrides). */
+function defaultLiveView(): "system" | "nearEarth" {
+  if (typeof window === "undefined") return "system";
+  return window.matchMedia("(max-width: 767px)").matches
+    ? "nearEarth"
+    : "system";
+}
+
 export function readStepFromHash(): MissionStepId {
   const hash = window.location.hash.replace(/^#/, "");
+  if (!hash) return "live";
   return STEP_IDS.includes(hash as MissionStepId)
     ? (hash as MissionStepId)
-    : "briefing";
+    : "live";
 }
 
 /**
  * Navigation + live reducer + selection + deep-link pending refs.
+ * Default entry: Live (03) so recruiters see the orbit first.
  */
 export function useMissionSession() {
   const { setCameraMode, setViewScale } = useSimActions();
   const initialUrl = useMemo(() => parseOrbitUrl(), []);
 
   const [step, setStep] = useState<MissionStepId>(() => {
-    const fromHash = readStepFromHash();
     if (initialUrl.mode === "live") return "live";
-    return fromHash;
+    if (initialUrl.mode === "story") {
+      const fromHash = readStepFromHash();
+      return fromHash === "live" ? "briefing" : fromHash;
+    }
+    return readStepFromHash();
   });
   const [mode, setMode] = useState<ViewMode>(() => {
     if (initialUrl.mode === "live" || initialUrl.mode === "story") {
       return initialUrl.mode;
     }
+    // Empty hash / Live step → Live NEO; other story steps stay Story until Enter live
     return readStepFromHash() === "live" ? "live" : "story";
   });
   const [selectedItem, setSelectedItem] = useState<CelestialItem | null>(null);
@@ -65,11 +79,22 @@ export function useMissionSession() {
   useEffect(() => {
     if (urlBootDone.current) return;
     urlBootDone.current = true;
-    if (initialUrl.mode === "live") {
+    // Canonical empty URL → #live so share links match default entry
+    if (!window.location.hash) {
+      const url = new URL(window.location.href);
+      url.hash = "live";
+      window.history.replaceState({}, "", url);
+    }
+    const bootLive =
+      initialUrl.mode === "live" ||
+      (initialUrl.mode !== "story" && readStepFromHash() === "live");
+    if (bootLive) {
       setMode("live");
       setStep("live");
-      setViewScale(initialUrl.view ?? "nearEarth");
-      setCameraMode("tour");
+      // Free cam by default — Tour is opt-in
+      // View: System on tablet/desktop; Near-Earth on phones (URL can override)
+      setViewScale(initialUrl.view ?? defaultLiveView());
+      setCameraMode("free");
       if (initialUrl.issFocus) {
         dispatchLive({ type: "SET_ISS", show: true, focus: true });
         setViewScale("nearEarth");
@@ -89,7 +114,12 @@ export function useMissionSession() {
   const goToStep = useCallback((next: MissionStepId) => {
     if (!STEP_IDS.includes(next)) return;
     setStep(next);
-    if (next === "live") setMode("live");
+    if (next === "live") {
+      setMode("live");
+    } else {
+      // 01 / 02 / 04: content-first story sections
+      setMode("story");
+    }
     const url = new URL(window.location.href);
     url.hash = next;
     window.history.replaceState({}, "", url);
@@ -98,14 +128,23 @@ export function useMissionSession() {
   const enterLive = useCallback(() => {
     setMode("live");
     goToStep("live");
-  }, [goToStep]);
+    setViewScale(defaultLiveView());
+    setCameraMode("free");
+  }, [goToStep, setViewScale, setCameraMode]);
+
+  /** Enable Live tools without leaving the current story step (mobile NEO tools chip). */
+  const ensureLiveMode = useCallback(() => {
+    setMode("live");
+    setViewScale(defaultLiveView());
+    setCameraMode("free");
+  }, [setViewScale, setCameraMode]);
 
   const handleModeChange = useCallback(
     (nextMode: ViewMode) => {
       setMode(nextMode);
       if (nextMode === "live") {
         goToStep("live");
-        setViewScale("nearEarth");
+        setViewScale(defaultLiveView());
         setCameraMode("free");
       } else {
         setSelectedItem((cur) => (cur && isAsteroid(cur) ? null : cur));
@@ -123,6 +162,7 @@ export function useMissionSession() {
       const s = readStepFromHash();
       setStep(s);
       if (s === "live") setMode("live");
+      else setMode("story");
     };
     window.addEventListener("hashchange", onHash);
     return () => window.removeEventListener("hashchange", onHash);
@@ -157,6 +197,7 @@ export function useMissionSession() {
     showAsteroids,
     goToStep,
     enterLive,
+    ensureLiveMode,
     handleModeChange,
     pendingNeo,
     pendingCompare,

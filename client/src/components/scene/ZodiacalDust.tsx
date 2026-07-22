@@ -29,10 +29,10 @@ export default function ZodiacalDust() {
         void main() {
           float r = length(vPos.xz);
           // Tight, soft band — visible near sun, gone by outer planets
-          float radial = exp(-r * 0.07) * smoothstep(55.0, 10.0, r);
-          float a = radial * 0.035;
+          float radial = exp(-r * 0.065) * smoothstep(62.0, 8.0, r);
+          float a = radial * 0.055;
           if (a < 0.002) discard;
-          vec3 col = vec3(0.75, 0.65, 0.42);
+          vec3 col = vec3(0.82, 0.7, 0.48);
           gl_FragColor = vec4(col, a);
         }
       `,

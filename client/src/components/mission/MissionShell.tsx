@@ -16,6 +16,8 @@ type MissionShellProps = {
   onStepChange: (step: MissionStepId) => void;
   onModeChange: (mode: ViewMode) => void;
   onEnterLive: () => void;
+  /** Open Live tools without leaving story step 01/02/04 */
+  onEnsureLiveMode?: () => void;
   liveToolsOpen: boolean;
   canvas: ReactNode;
   status: {
@@ -57,6 +59,7 @@ export default function MissionShell({
   onStepChange,
   onModeChange,
   onEnterLive,
+  onEnsureLiveMode,
   liveToolsOpen,
   canvas,
   status,
@@ -69,7 +72,7 @@ export default function MissionShell({
   const fineHover = useMediaQuery("(hover: hover) and (pointer: fine)", false);
   const mobileChrome = narrow || landscape;
   const waking = useSlowLoading(status.loading, 3000);
-  const isLiveStep = liveToolsOpen || step === "live";
+  const isLiveSection = step === "live";
 
   // Track pointer so the hover chip sits near the cursor (not stranded under the bar)
   const [pointer, setPointer] = useState({ x: 0, y: 0 });
@@ -90,22 +93,81 @@ export default function MissionShell({
         ? "border-cyan-400/50 bg-cyan-950/90 text-cyan-50 shadow-[0_0_16px_rgba(34,211,238,0.28)]"
         : "border-sky-400/50 bg-sky-950/90 text-sky-50 shadow-[0_0_16px_rgba(56,189,248,0.3)]";
 
-  // Viz: desktop open by default; mobile only on Live and collapsed until toggled
+  // Viz: desktop open by default; mobile collapsed until toggled (Live only)
   const [vizOpen, setVizOpen] = useState(() => !narrow);
   useEffect(() => {
     if (!narrow && !landscape) setVizOpen(true);
-    else if (!isLiveStep) setVizOpen(false);
-  }, [narrow, landscape, isLiveStep]);
+    else setVizOpen(false);
+  }, [narrow, landscape, step]);
 
-  // Live tools: collapsed by default on mobile so canvas is first paint
+  // Live tools sheet: collapsed by default on mobile so content/canvas first
   const [liveOpenMobile, setLiveOpenMobile] = useState(false);
   useEffect(() => {
+    // Only force-close when Live mode turns off (not when turning on via NEO tools chip)
     if (!liveToolsOpen) setLiveOpenMobile(false);
   }, [liveToolsOpen]);
+  useEffect(() => {
+    setLiveOpenMobile(false);
+    if (mobileChrome) setVizOpen(false);
+  }, [step, mobileChrome]);
+
+  // Live guide: open by default on tablet/desktop (closable); phone uses tip banner
+  const phonePortrait = narrow && !landscape;
+  const [liveGuideOpen, setLiveGuideOpen] = useState(true);
+  const [mobileLiveGuideOpen, setMobileLiveGuideOpen] = useState(true);
+  useEffect(() => {
+    if (!isLiveSection) {
+      setLiveGuideOpen(false);
+      return;
+    }
+    // Fresh visit to Live: guide visible; user can dismiss and reopen via Guide
+    if (phonePortrait) setMobileLiveGuideOpen(true);
+    else setLiveGuideOpen(true);
+  }, [isLiveSection, phonePortrait]);
 
   const showLivePanel = liveToolsOpen && (!mobileChrome || liveOpenMobile);
-  // Mobile Live FABs only on step Live — not over story/project links
-  const showMobileLiveToggles = mobileChrome && isLiveStep;
+  // Mobile tool chips only on Live (03) — content sections stay clean
+  const showMobileToolChips = mobileChrome && isLiveSection;
+
+  // Live guide visibility:
+  // - phone portrait: dismissible top banner (hidden while tools/viz open)
+  // - tablet + desktop: left panel open by default, optional to close
+  // - story steps: always show content dock
+  const showStoryDock = (() => {
+    if (narrow && showLivePanel && !landscape) return false;
+    if (isLiveSection) {
+      if (phonePortrait) {
+        return mobileLiveGuideOpen && !liveOpenMobile && !vizOpen;
+      }
+      return liveGuideOpen;
+    }
+    return true;
+  })();
+  const showGuideReopenChip =
+    isLiveSection &&
+    ((phonePortrait && !mobileLiveGuideOpen && !liveOpenMobile) ||
+      (!phonePortrait && !liveGuideOpen));
+
+  /** Mutual exclusion: opening NEO tools closes Viz (and vice versa). */
+  const openNeoTools = () => {
+    if (!liveToolsOpen) onEnsureLiveMode?.();
+    setVizOpen(false);
+    setLiveOpenMobile(true);
+  };
+  const toggleNeoTools = () => {
+    if (liveOpenMobile) {
+      setLiveOpenMobile(false);
+      return;
+    }
+    openNeoTools();
+  };
+  const toggleViz = () => {
+    setVizOpen((open) => {
+      const next = !open;
+      if (next) setLiveOpenMobile(false);
+      return next;
+    });
+  };
 
   // Esc closes mobile Live sheet
   useEffect(() => {
@@ -169,21 +231,31 @@ export default function MissionShell({
         </div>
       )}
 
-      {/* Hide story dock when mobile Live sheet is open */}
-      {!(narrow && showLivePanel && !landscape) && (
+      {showStoryDock && (
         <MissionDock
           step={step}
           onStepChange={onStepChange}
           onEnterLive={onEnterLive}
           landscape={landscape}
+          liveLayout={
+            isLiveSection && phonePortrait ? "banner" : "panel"
+          }
+          onRequestClose={
+            isLiveSection
+              ? () =>
+                  phonePortrait
+                    ? setMobileLiveGuideOpen(false)
+                    : setLiveGuideOpen(false)
+              : undefined
+          }
         />
       )}
 
       {/*
-        Mobile Live-only toggles: top-right under header (not over dock footers).
-        Open tools → inspect → hide to reveal the scene result.
+        Mobile Live (03): Guide + NEO tools + Viz (tools/viz mutually exclusive).
+        Guide reopens the tip after dismiss (phone) or left panel (landscape tablet).
       */}
-      {showMobileLiveToggles && (
+      {showMobileToolChips && (
         <div
           className={`absolute z-40 pointer-events-auto flex gap-1.5 safe-pad-x
             ${
@@ -192,22 +264,36 @@ export default function MissionShell({
                 : "right-3 top-[3.55rem] flex-row"
             }`}
         >
-          {liveToolsOpen && (
+          {showGuideReopenChip && (
             <button
               type="button"
-              onClick={() => setLiveOpenMobile((v) => !v)}
+              onClick={() =>
+                phonePortrait
+                  ? setMobileLiveGuideOpen(true)
+                  : setLiveGuideOpen(true)
+              }
               className="text-[11px] font-semibold px-2.5 py-1.5 rounded-full border border-white/15
-                bg-black/75 backdrop-blur-md text-sky-200 tap-target shadow-lg whitespace-nowrap
+                bg-black/75 backdrop-blur-md text-sky-100 tap-target shadow-lg whitespace-nowrap
                 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400"
-              aria-pressed={liveOpenMobile}
-              aria-label={liveOpenMobile ? "Hide NEO tools" : "Show NEO tools"}
+              aria-label="Show Live guide"
             >
-              {liveOpenMobile ? "Hide tools" : "NEO tools"}
+              Guide
             </button>
           )}
           <button
             type="button"
-            onClick={() => setVizOpen((v) => !v)}
+            onClick={toggleNeoTools}
+            className="text-[11px] font-semibold px-2.5 py-1.5 rounded-full border border-white/15
+              bg-black/75 backdrop-blur-md text-sky-200 tap-target shadow-lg whitespace-nowrap
+              focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400"
+            aria-pressed={liveOpenMobile}
+            aria-label={liveOpenMobile ? "Hide NEO tools" : "Show NEO tools"}
+          >
+            {liveOpenMobile ? "Hide tools" : "NEO tools"}
+          </button>
+          <button
+            type="button"
+            onClick={toggleViz}
             className="text-[11px] font-semibold px-2.5 py-1.5 rounded-full border border-white/15
               bg-black/75 backdrop-blur-md text-cyan-200 tap-target shadow-lg
               focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400"
@@ -216,6 +302,21 @@ export default function MissionShell({
             {vizOpen ? "Hide viz" : "Viz"}
           </button>
         </div>
+      )}
+
+      {/* Desktop / large tablet: reopen guide after Hide guide */}
+      {!mobileChrome && showGuideReopenChip && (
+        <button
+          type="button"
+          onClick={() => setLiveGuideOpen(true)}
+          className="absolute z-40 left-4 top-16 pointer-events-auto
+            text-[11px] font-semibold px-2.5 py-1.5 rounded-full border border-white/15
+            bg-black/75 backdrop-blur-md text-sky-200 shadow-lg whitespace-nowrap
+            focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400"
+          aria-label="Show Live guide"
+        >
+          Guide
+        </button>
       )}
 
       {/*
@@ -282,10 +383,9 @@ export default function MissionShell({
           </div>
         )}
 
-        {/* Viz: desktop always available; mobile only when toggled on Live */}
+        {/* Viz: desktop always available; mobile when toggled (any section) */}
         {(vizOpen || !mobileChrome) &&
-          !(narrow && showLivePanel && !landscape) &&
-          (!mobileChrome || isLiveStep) && (
+          !(narrow && showLivePanel && !landscape) && (
             <div
               className={
                 landscape
@@ -294,7 +394,7 @@ export default function MissionShell({
                     ? `pointer-events-auto absolute right-3 top-[6.25rem] max-w-[min(92vw,280px)]`
                     : `pointer-events-auto
                         md:static md:translate-x-0 md:max-w-none md:shrink-0
-                        ${liveToolsOpen ? "" : "md:mt-auto md:self-end md:w-[min(300px,90vw)]"}`
+                        ${isLiveSection && liveToolsOpen ? "" : "md:mt-auto md:self-end md:w-[min(300px,90vw)]"}`
               }
             >
               <VizControls

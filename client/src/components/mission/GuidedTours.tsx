@@ -5,7 +5,8 @@ export type GuidedTourId =
   | "earth"
   | "iss"
   | "system"
-  | "trueScale";
+  | "trueScale"
+  | "milkyWay";
 
 type GuidedToursProps = {
   onRun: (id: GuidedTourId) => void;
@@ -43,6 +44,12 @@ const TOURS: {
     id: "trueScale",
     label: "True-size peek",
     blurb: "Toggle true scale for planet sizes",
+  },
+  {
+    id: "milkyWay",
+    label: "Inside the disk",
+    blurb:
+      "System view · MW band is our galaxy (Sun’s ~230 Myr galactic orbit not animated)",
   },
 ];
 
@@ -83,7 +90,8 @@ export default function GuidedTours({
       {!collapsed && (
         <ul className="space-y-1 px-2 pb-2">
           <li className="text-[10px] text-gray-500 px-1 pb-0.5 leading-snug">
-            Portfolio walkthrough: Closest → Earth → ISS → System
+            Portfolio walkthrough: Closest → Earth → ISS → System → Inside the
+            disk
           </li>
           {TOURS.map((t) => (
             <li key={t.id}>

@@ -28,26 +28,25 @@ export default function MissionTopBar({
 
   return (
     <header
-      className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between gap-2 sm:gap-3
-        px-3 py-2.5 sm:px-4 sm:py-3 md:px-5
+      className="absolute top-0 left-0 right-0 z-20
+        grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-1.5 sm:gap-3
+        px-2.5 py-2 sm:px-4 sm:py-3 md:px-5
         safe-pad-x safe-pad-t
         bg-gradient-to-b from-black/90 via-black/70 to-transparent"
     >
-      <div className="shrink-0 min-w-0">
-        <div className="font-bold tracking-widest text-sm md:text-base">
+      <div className="shrink-0 min-w-0 max-w-[4.25rem] sm:max-w-none">
+        <div className="font-bold tracking-widest text-xs sm:text-sm md:text-base truncate">
           {brand}
           <span className="text-custom-blue">.</span>
         </div>
-        <p className="sm:hidden text-[9px] uppercase tracking-wider text-cyan-300/70 truncate max-w-[5.5rem]">
+        <p className="hidden sm:block text-[9px] uppercase tracking-wider text-cyan-300/70 truncate">
           {STEP_SHORT[step] ?? active?.section ?? step}
         </p>
       </div>
 
-      {/* Mobile + desktop: scrollable steps */}
+      {/* All four steps always visible on phone — no scroll / no max-width trap */}
       <nav
-        className="flex flex-1 min-w-0 max-w-[min(52vw,16rem)] sm:max-w-none
-          gap-1 justify-start sm:justify-center overflow-x-auto scrollbar-none
-          touch-pan-x"
+        className="flex min-w-0 justify-center items-center gap-0.5 sm:gap-1"
         aria-label="Mission sections"
       >
         {MISSION_STEPS.map((s) => {
@@ -58,7 +57,7 @@ export default function MissionTopBar({
               type="button"
               onClick={() => onStepChange(s.id)}
               title={s.label}
-              className={`shrink-0 text-[11px] sm:text-xs px-2.5 sm:px-3 py-1.5 rounded-lg border transition-colors tap-target
+              className={`shrink-0 text-[11px] sm:text-xs px-2 sm:px-3 py-1.5 rounded-lg border transition-colors
                 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400
                 ${
                   step === s.id
@@ -74,14 +73,14 @@ export default function MissionTopBar({
       </nav>
 
       <div
-        className="inline-flex gap-0.5 p-0.5 rounded-full bg-black/40 border border-white/10 shrink-0"
+        className="inline-flex gap-0 p-0.5 rounded-full bg-black/40 border border-white/10 shrink-0"
         role="group"
         aria-label="View mode"
       >
         <button
           type="button"
           onClick={() => onModeChange("story")}
-          className={`text-[11px] sm:text-xs font-semibold px-2 sm:px-2.5 py-1.5 rounded-full transition-colors tap-target ${
+          className={`text-[10px] sm:text-xs font-semibold px-1.5 sm:px-2.5 py-1 sm:py-1.5 rounded-full transition-colors ${
             mode === "story"
               ? "bg-custom-blue text-white"
               : "text-gray-400 hover:text-white"
@@ -92,7 +91,7 @@ export default function MissionTopBar({
         <button
           type="button"
           onClick={() => onModeChange("live")}
-          className={`text-[11px] sm:text-xs font-semibold px-2 sm:px-2.5 py-1.5 rounded-full transition-colors tap-target ${
+          className={`text-[10px] sm:text-xs font-semibold px-1.5 sm:px-2.5 py-1 sm:py-1.5 rounded-full transition-colors ${
             mode === "live"
               ? "bg-custom-blue text-white"
               : "text-gray-400 hover:text-white"

@@ -110,11 +110,11 @@ export default function NeoMissList({
             {waking ? (
               <>
                 <p className="text-xs text-amber-200/90 animate-pulse">
-                  Waking mission API (free tier)…
+                  Waking free-tier API…
                 </p>
                 <p className="text-[10px] text-gray-500 leading-snug">
-                  First Live request after idle can take ~20–60s. The scene stays
-                  ready.
+                  First Live hit after idle can take ~20–60s. Demo catalog is
+                  available if you need data now.
                 </p>
               </>
             ) : (

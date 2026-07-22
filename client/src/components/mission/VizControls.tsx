@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import {
   useSimSettings,
   useSimActions,
@@ -52,6 +52,76 @@ const VIEWS: { value: ViewScale; label: string; title: string }[] = [
   },
 ];
 
+function VizInfoPanel({ id }: { id: string }) {
+  return (
+    <div
+      id={id}
+      className="rounded-lg border border-sky-400/25 bg-sky-950/40 px-2.5 py-2 space-y-2 text-[10px] leading-snug text-gray-300"
+      role="region"
+      aria-label="Visualization help"
+    >
+      <div>
+        <p className="text-sky-200 font-semibold uppercase tracking-wider text-[0.62rem] mb-0.5">
+          Mission clock
+        </p>
+        <p>
+          Simulated animation time for the 3D scene (not live wall-clock UTC).
+          Shown as year · day of a sim year.{" "}
+          <strong className="text-gray-200">Time</strong> speeds (❚❚ / 0.1× /
+          1× / 10×) only change how fast orbits move on screen.
+        </p>
+      </div>
+      <div>
+        <p className="text-sky-200 font-semibold uppercase tracking-wider text-[0.62rem] mb-0.5">
+          View · System vs Near-Earth
+        </p>
+        <p className="mb-1">
+          <strong className="text-gray-200">System</strong> — full solar system
+          framing for planets and heliocentric orbits.
+        </p>
+        <p>
+          <strong className="text-gray-200">Near-Earth</strong> — Earth
+          neighborhood framing for Live NEOs. Use this when inspecting close
+          approaches; the scene is laid out for miss-distance context.
+        </p>
+      </div>
+      <div>
+        <p className="text-sky-200 font-semibold uppercase tracking-wider text-[0.62rem] mb-0.5">
+          True-scale
+        </p>
+        <p>
+          Visual only: body sizes and orbit spacing. Off = exaggerated so small
+          bodies stay visible. On = closer to relative proportions (planets look
+          smaller). Does <em>not</em> change NASA catalog numbers.
+        </p>
+      </div>
+      <div>
+        <p className="text-sky-200 font-semibold uppercase tracking-wider text-[0.62rem] mb-0.5">
+          Sun · Milky Way
+        </p>
+        <p>
+          The Sun (and planets with it) orbits the{" "}
+          <strong className="text-gray-200">galactic center</strong> once every
+          ~230 million years at ~220–250 km/s. The glowing band is that galaxy
+          seen from inside the disk — backdrop only; this scene does not animate
+          the multi-million-year galactic orbit.
+        </p>
+      </div>
+      <div className="rounded-md border border-emerald-400/25 bg-emerald-950/30 px-2 py-1.5 text-emerald-100/95">
+        <p className="font-semibold text-emerald-200/95 mb-0.5">
+          Where are real distances?
+        </p>
+        <p>
+          <strong>Catalog miss</strong> (LD / km on each NEO) is real NASA /
+          CNEOS approach data — that is the true measurement. Prefer{" "}
+          <strong>Near-Earth</strong> view while reading it. The distance ruler
+          is approximate scene geometry (viz-compressed), not a lab survey.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 type VizControlsProps = {
   onScreenshot?: () => void;
   /**
@@ -91,6 +161,8 @@ export default function VizControls({
   } = useSimActions();
 
   const [clockLabel, setClockLabel] = useState("Y1 · D1");
+  const [infoOpen, setInfoOpen] = useState(false);
+  const infoId = useId();
   const ambientRef = useRef<HTMLAudioElement | null>(null);
   const clickRef = useRef<HTMLAudioElement | null>(null);
 
@@ -242,13 +314,34 @@ export default function VizControls({
       aria-label="Visualization controls"
     >
       <div className="flex items-center justify-between gap-2 px-1">
-        <span className="text-cyan-300/90 uppercase tracking-wider text-[0.62rem]">
-          Mission clock
-        </span>
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="text-cyan-300/90 uppercase tracking-wider text-[0.62rem]">
+            Mission clock
+          </span>
+          <button
+            type="button"
+            onClick={() => setInfoOpen((v) => !v)}
+            className={`shrink-0 inline-flex h-5 w-5 items-center justify-center rounded-full border text-[11px] font-bold leading-none transition-colors
+              focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400
+              ${
+                infoOpen
+                  ? "border-sky-400/60 bg-sky-500/25 text-sky-100"
+                  : "border-white/20 bg-black/40 text-sky-200/90 hover:border-sky-400/40 hover:text-sky-100"
+              }`}
+            aria-expanded={infoOpen}
+            aria-controls={infoId}
+            title="How clock, views, and scale work"
+            aria-label="About mission clock, views, and true-scale"
+          >
+            i
+          </button>
+        </div>
         <span className="font-mono text-sky-200/95 text-xs tabular-nums">
           {clockLabel}
         </span>
       </div>
+
+      {infoOpen && <VizInfoPanel id={infoId} />}
 
       <div className="flex items-center gap-1 flex-wrap">
         <span className="text-cyan-300/90 uppercase tracking-wider text-[0.62rem] mr-1">

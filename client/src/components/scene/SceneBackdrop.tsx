@@ -2,9 +2,9 @@ import { useLayoutEffect } from "react";
 import { useThree } from "@react-three/fiber";
 import * as THREE from "three";
 
-const CLEAR = "#010308";
+/** Deep navy void (cinematic mock) — solid color only, no sky plate. */
+const CLEAR = "#020612";
 
-/** Dark clear + subtle fog. Always solid dark — no sky plate fight. */
 export function SceneBackdrop() {
   const { gl, scene } = useThree();
 
@@ -14,5 +14,5 @@ export function SceneBackdrop() {
     scene.background = c;
   }, [gl, scene]);
 
-  return <fog attach="fog" args={[CLEAR, 180, 560]} />;
+  return <fog attach="fog" args={[CLEAR, 220, 620]} />;
 }

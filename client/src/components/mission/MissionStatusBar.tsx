@@ -42,7 +42,7 @@ export default function MissionStatusBar({
   const statusText = error
     ? `Signal degraded · ${error.message || "API error"}`
     : loading && waking
-      ? "Waking mission API (free tier)…"
+      ? "Waking free-tier API (~20–60s on first hit)…"
       : loading
         ? "Receiving telemetry…"
         : "Systems nominal";

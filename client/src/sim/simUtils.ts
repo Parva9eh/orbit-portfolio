@@ -51,7 +51,7 @@ export function qualitySettings(q: QualityPreset) {
   }
 
   return {
-    starCount: 8500,
+    starCount: 11000,
     beltCount: 900,
     bloomIntensity: 0.42,
     bloomThreshold: 0.7,
@@ -64,9 +64,9 @@ export function qualitySettings(q: QualityPreset) {
     maxNeos: 28,
     planetSegments: 80,
     sunSegments: 128,
-    orbitLineWidth: 0.85,
-    vignetteDarkness: 0.55,
-    exposure: 0.96,
+    orbitLineWidth: 0.95,
+    vignetteDarkness: 0.5,
+    exposure: 1.02,
   };
 }
 
