@@ -8,6 +8,7 @@ import {
   type ViewScale,
 } from "../../sim/useSim";
 import { formatSimClock } from "../../sim/simUtils";
+import { trackVizInfo } from "../../lib/analytics";
 
 const SPEEDS: { value: TimeScalePreset; label: string }[] = [
   { value: 0, label: "❚❚" },
@@ -320,7 +321,13 @@ export default function VizControls({
           </span>
           <button
             type="button"
-            onClick={() => setInfoOpen((v) => !v)}
+            onClick={() =>
+              setInfoOpen((v) => {
+                const next = !v;
+                if (next) trackVizInfo(true);
+                return next;
+              })
+            }
             className={`shrink-0 inline-flex h-5 w-5 items-center justify-center rounded-full border text-[11px] font-bold leading-none transition-colors
               focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400
               ${

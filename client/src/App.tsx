@@ -1,4 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import { Analytics } from "@vercel/analytics/react";
 import MissionControl from "./pages/MissionControl";
 import { SimProvider } from "./sim/SimContext";
 
@@ -13,6 +14,8 @@ function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Router>
+      {/* Page views + custom events (enable Web Analytics in Vercel project) */}
+      <Analytics />
     </SimProvider>
   );
 }

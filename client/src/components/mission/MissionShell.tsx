@@ -8,6 +8,7 @@ import type { MissionStepId } from "../../content/site";
 import type { CelestialItem, IssPosition } from "@shared";
 import type { DonkiSolarBadge } from "../../hooks/useDonkiSolar";
 import { useSlowLoading } from "../../hooks/useSlowLoading";
+import { trackNeoTools } from "../../lib/analytics";
 
 type MissionShellProps = {
   brand: string;
@@ -153,10 +154,12 @@ export default function MissionShell({
     if (!liveToolsOpen) onEnsureLiveMode?.();
     setVizOpen(false);
     setLiveOpenMobile(true);
+    trackNeoTools("open");
   };
   const toggleNeoTools = () => {
     if (liveOpenMobile) {
       setLiveOpenMobile(false);
+      trackNeoTools("close");
       return;
     }
     openNeoTools();

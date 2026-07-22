@@ -1,4 +1,5 @@
 import { useState, type FocusEvent, type FormEvent } from "react";
+import { trackCommsSubmit } from "../../lib/analytics";
 
 type Status = "idle" | "sending" | "sent" | "error";
 
@@ -86,6 +87,7 @@ export default function ContactForm() {
     if (Object.keys(errors).length > 0) {
       setStatus("idle");
       setErrorDetail(null);
+      trackCommsSubmit("validation");
       return;
     }
 
@@ -94,6 +96,7 @@ export default function ContactForm() {
         "Form is offline in this build — set VITE_WEB3FORMS_ACCESS_KEY, or use GitHub."
       );
       setStatus("error");
+      trackCommsSubmit("error");
       return;
     }
 
@@ -129,9 +132,11 @@ export default function ContactForm() {
       setStatus("sent");
       setFieldErrors({});
       form.reset();
+      trackCommsSubmit("sent");
     } catch (err) {
       setStatus("error");
       setErrorDetail(err instanceof Error ? err.message : "Send failed");
+      trackCommsSubmit("error");
     }
   }
 
