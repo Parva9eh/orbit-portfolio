@@ -23,7 +23,8 @@ export type GuidedTourArgs = {
 };
 
 /**
- * One-click guided demos (closest NEO, Earth, ISS, system, true scale).
+ * One-click guided demos (closest NEO, Earth, ISS, system, true scale, MW context).
+ * Stays planetary mission control — no separate galaxy-map mode.
  */
 export function useGuidedTour({
   dispatchLive,
@@ -81,6 +82,17 @@ export function useGuidedTour({
         setTrueScale(!trueScale);
         setViewScale("system");
         setCameraMode("tour");
+        return;
+      }
+      if (id === "milkyWay") {
+        // Schematic galactic context: system framing + free cam to see the band
+        setMode("live");
+        goToStep("live");
+        setViewScale("system");
+        dispatchLive({ type: "SET_ISS", show: false, focus: false });
+        setSelectedItem(null);
+        setCameraMode("free");
+        window.dispatchEvent(new CustomEvent("orbit-camera-home"));
       }
     },
     [
