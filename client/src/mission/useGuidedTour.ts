@@ -4,6 +4,7 @@ import type { GuidedTourId } from "../components/mission/GuidedTours";
 import type { ViewMode } from "../components/mission/MissionTopBar";
 import type { MissionStepId } from "../content/site";
 import { closestAsteroid } from "../lib/neoSort";
+import { trackGuidedTour } from "../lib/analytics";
 import type { LiveMissionAction } from "./liveMissionState";
 import type { ViewScale } from "../sim/useSim";
 import type { PaginatedResponse } from "@shared";
@@ -41,6 +42,7 @@ export function useGuidedTour({
 }: GuidedTourArgs) {
   const handleGuidedTour = useCallback(
     (id: GuidedTourId) => {
+      trackGuidedTour(id);
       dispatchLive({ type: "SET_ISS_FOCUS", value: false });
       if (id === "closest") {
         setMode("live");

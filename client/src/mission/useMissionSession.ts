@@ -13,6 +13,7 @@ import { site, MISSION_STEPS, type MissionStepId } from "../content/site";
 import type { ViewMode } from "../components/mission/MissionTopBar";
 import { useSimActions } from "../sim/useSim";
 import { parseOrbitUrl } from "../lib/urlState";
+import { trackEnterLive, trackMissionStep } from "../lib/analytics";
 import {
   initialLiveMissionState,
   liveMissionReducer,
@@ -123,6 +124,7 @@ export function useMissionSession() {
     const url = new URL(window.location.href);
     url.hash = next;
     window.history.replaceState({}, "", url);
+    trackMissionStep(next);
   }, []);
 
   const enterLive = useCallback(() => {
@@ -130,6 +132,7 @@ export function useMissionSession() {
     goToStep("live");
     setViewScale(defaultLiveView());
     setCameraMode("free");
+    trackEnterLive("cta");
   }, [goToStep, setViewScale, setCameraMode]);
 
   /** Enable Live tools without leaving the current story step (mobile NEO tools chip). */
@@ -137,6 +140,7 @@ export function useMissionSession() {
     setMode("live");
     setViewScale(defaultLiveView());
     setCameraMode("free");
+    trackEnterLive("neo_tools");
   }, [setViewScale, setCameraMode]);
 
   const handleModeChange = useCallback(
@@ -146,6 +150,7 @@ export function useMissionSession() {
         goToStep("live");
         setViewScale(defaultLiveView());
         setCameraMode("free");
+        trackEnterLive("mode_toggle");
       } else {
         setSelectedItem((cur) => (cur && isAsteroid(cur) ? null : cur));
         dispatchLive({ type: "CLEAR_COMPARE" });

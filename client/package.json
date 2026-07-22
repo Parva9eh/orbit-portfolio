@@ -16,6 +16,7 @@
     "@react-three/drei": "^10.7.4",
     "@react-three/fiber": "^9.3.0",
     "@react-three/postprocessing": "^3.0.4",
+    "@vercel/analytics": "^2.0.1",
     "axios": "^1.11.0",
     "lodash": "^4.17.21",
     "react": "^19.1.1",
@@ -25,8 +26,8 @@
     "three-stdlib": "^2.36.0"
   },
   "devDependencies": {
-    "@playwright/test": "^1.51.0",
     "@eslint/js": "^9.33.0",
+    "@playwright/test": "^1.51.0",
     "@types/lodash": "^4.17.13",
     "@types/node": "^22.20.1",
     "@types/react": "^19.1.10",
